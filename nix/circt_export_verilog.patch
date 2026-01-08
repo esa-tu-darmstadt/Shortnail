@@ -1,0 +1,34 @@
+diff --git a/lib/Conversion/ExportVerilog/ExportVerilog.cpp b/lib/Conversion/ExportVerilog/ExportVerilog.cpp
+index 424f1a82..fc04670d 100644
+--- a/lib/Conversion/ExportVerilog/ExportVerilog.cpp
++++ b/lib/Conversion/ExportVerilog/ExportVerilog.cpp
+@@ -2510,6 +2511,29 @@ SubExprInfo ExprEmitter::emitBinary(Operation *op, VerilogPrecedence prec,
+   // Use non-breaking space between op and RHS so breaking is consistent.
+   ps << lhsSpace << syntax << PP::nbsp; // PP::space;
+ 
++  if (auto id = op->getAttrOfType<IntegerAttr>("lil.ln_id");
++      id && !isa<ConcatOp, ReplicateOp>(op)) {
++    ps << "/*" << PP::nbsp
++       << "LN_ID=" << PPSaveString(Twine(id.getValue().getZExtValue()).str())
++       << PP::nbsp;
++
++    if (auto instNames = op->getAttrOfType<ArrayAttr>("lil.inst_names")) {
++      ps << "PARENT_INST_NAME=[";
++      bool notFirst = false;
++      for (auto attr : instNames) {
++        if (notFirst)
++          ps << "," << PP::nbsp;
++
++        ps << cast<StringAttr>(attr).getValue();
++
++        notFirst = true;
++      }
++      ps << "]";
++    }
++
++    ps << PP::nbsp << "*/" << PP::nbsp;
++  }
++
+   // Right associative operators are already generally variadic, we need to
+   // handle things like: (a<4> == b<4>) == (c<3> == d<3>).  When processing the
+   // top operation of the tree, the rhs needs parens.  When processing

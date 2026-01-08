@@ -1,0 +1,10 @@
+add_shortnail_dialect(CoreDSL coredsl)
+add_shortnail_dialect_doc(CoreDSL coredsl)
+# add_mlir_doc(CoreDSL CoreDSLDialect ./ -gen-dialect-doc -dialect coredsl)
+add_shortnail_interface(CoreDSLInterfaces)
+
+set(LLVM_TARGET_DEFINITIONS CoreDSL.td)
+mlir_tablegen(CoreDSLEnums.h.inc -gen-enum-decls)
+mlir_tablegen(CoreDSLEnums.cpp.inc -gen-enum-defs)
+add_public_tablegen_target(MLIRCoreDSLEnumsIncGen)
+add_dependencies(shortnail-headers MLIRCoreDSLEnumsIncGen)

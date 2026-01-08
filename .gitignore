@@ -1,0 +1,10 @@
+shortnail
+.direnv
+/build*
+.cache
+.vscode
+a.out
+*.dot
+*.kate-swp
+*.log
+*.stats

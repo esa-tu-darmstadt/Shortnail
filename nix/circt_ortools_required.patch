@@ -1,0 +1,30 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f62f9df5..7bbf9fe3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -439,9 +439,9 @@ else()
+     list(APPEND CMAKE_PREFIX_PATH ${OR_TOOLS_PATH})
+   endif()
+ 
+-  list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/ext)
++  # list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/ext)
+ 
+-  find_package(ortools CONFIG)
++  find_package(ortools CONFIG REQUIRED)
+ 
+   if (ortools_FOUND)
+     get_filename_component(ortools_CMAKEDIR ${ortools_DIR} DIRECTORY)
+diff --git a/lib/Scheduling/CMakeLists.txt b/lib/Scheduling/CMakeLists.txt
+index 5d59a106..f615ca20 100644
+--- a/lib/Scheduling/CMakeLists.txt
++++ b/lib/Scheduling/CMakeLists.txt
+@@ -33,3 +33,9 @@ add_circt_library(CIRCTScheduling
+   LINK_LIBS PUBLIC
+   ${SCHEDULING_LIBS}
+   )
++
++if(ortools_FOUND)
++  # Ortools 9.12 requires the presence of some definitions in order to define... some how they are only pulled in for linking target.
++  # But we need them for the obj file creation target! Thus, we add them manually.
++  target_compile_definitions(obj.CIRCTScheduling PRIVATE $<TARGET_PROPERTY:ortools::ortools,INTERFACE_COMPILE_DEFINITIONS>)
++endif()
