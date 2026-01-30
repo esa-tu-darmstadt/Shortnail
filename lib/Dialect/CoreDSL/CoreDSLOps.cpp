@@ -13,6 +13,7 @@
 #include "circt/Dialect/HWArith/HWArithOps.h"
 #include "circt/Dialect/HWArith/HWArithTypes.h"
 
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OpImplementation.h"
