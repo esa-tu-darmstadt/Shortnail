@@ -18,9 +18,6 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-// Include scf dialect because we use scf.yield for the custom switch instruction
-#include "mlir/Dialect/SCF/IR/SCF.h"
-
 #include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLInterfaces.h.inc"
 
