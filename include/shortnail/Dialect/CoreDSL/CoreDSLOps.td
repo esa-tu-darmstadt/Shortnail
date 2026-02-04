@@ -695,6 +695,7 @@ def CastOp : CoreDSL_Op<"cast", [Pure]> {
 def YieldOp : CoreDSL_Op<"yield", [Pure, ReturnLike, Terminator,
     ParentOneOf<["SwitchOp"]>]> {
   let summary = "loop yield and termination operation";
+  // TODO: update description
   let description = [{
     The `scf.yield` operation yields an SSA value from the SCF dialect op region and
     terminates the regions. The semantics of how the values are yielded is
@@ -721,9 +722,10 @@ def SwitchOp : CoreDSL_Op<"switch", [RecursiveMemoryEffects,
                                "getEntrySuccessorRegions"]>]> {
   let summary = "switch-case operation on an index argument";
   let description = [{
-    The `scf.index_switch` is a control-flow operation that branches to one of
-    the given regions based on the values of the argument and the cases. The
-    argument is always of type `index`.
+    `coredsl.switch` is a modified version of `scf.index_switch` that branches
+    to one of the given regions based on the values of the argument and the
+    cases. As opposed to `scf.index_switch`, this operation accepts any integer
+    as argument.
 
     The operation always has a "default" region and any number of case regions
     denoted by integer constants. Control-flow transfers to the case region
@@ -733,25 +735,25 @@ def SwitchOp : CoreDSL_Op<"switch", [RecursiveMemoryEffects,
 
     Example:
 
+    // TODO: fix when syntax finalized
     ```mlir
-    %0 = scf.index_switch %arg0 : index -> i32
+    %0 = coredsl.switch %arg0 : ui32 -> ui32
     case 2 {
-      %1 = arith.constant 10 : i32
-      scf.yield %1 : i32
+      %1 = hwarith.constant 10 : ui32
+      coredsl.yield %1 : ui32
     }
     case 5 {
-      %2 = arith.constant 20 : i32
-      scf.yield %2 : i32
+      %2 = hwarith.constant 20 : ui32
+      coredsl.yield %2 : ui32
     }
     default {
-      %3 = arith.constant 30 : i32
-      scf.yield %3 : i32
+      %3 = hwarith.constant 30 : ui32
+      coredsl.yield %3 : ui32
     }
     ```
   }];
 
-  // TODO: make this not be Index, but any integer type
-  let arguments = (ins AnyInteger:$arg, DenseI64ArrayAttr:$cases);
+  let arguments = (ins AnyInteger:$arg, ArrayAttr:$cases);
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$defaultRegion,
                         VariadicRegion<SizedRegion<1>>:$caseRegions);
