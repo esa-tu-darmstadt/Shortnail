@@ -19,6 +19,7 @@
 #include "mlir/IR/OpImplementation.h"
 
 #include "llvm/ADT/APSInt.h"
+#include "llvm/Support/Debug.h"
 
 using namespace circt::hwarith;
 
@@ -1014,28 +1015,39 @@ LogicalResult CastOp::verify() {
 
 /// Parse the case regions and values.
 static ParseResult
-parseSwitchCases(OpAsmParser &p, DenseI64ArrayAttr &cases,
+parseSwitchCases(OpAsmParser &p, ArrayAttr &cases,
                  SmallVectorImpl<std::unique_ptr<Region>> &caseRegions) {
-  SmallVector<int64_t> caseValues;
+  SmallVector<Attribute> caseValues;
   while (succeeded(p.parseOptionalKeyword("case"))) {
-    int64_t value;
+    APInt signlessValue;
     Region &region = *caseRegions.emplace_back(std::make_unique<Region>());
-    if (p.parseInteger(value) || p.parseRegion(region, /*arguments=*/{}))
+    if (p.parseInteger(signlessValue) || p.parseRegion(region, /*arguments=*/{}))
       return failure();
-    caseValues.push_back(value);
+    // We can use APInt::isNegative here, because parseInteger() only sets the
+    // MSB if the literal is negative
+    APSInt signedValue{signlessValue, !signlessValue.isNegative()};
+    IntegerAttr attr = IntegerAttr::get(p.getContext(), signedValue);
+    caseValues.push_back(attr);
   }
-  cases = p.getBuilder().getDenseI64ArrayAttr(caseValues);
+  cases = ArrayAttr::get(p.getContext(), caseValues);
   return success();
 }
 
 /// Print the case regions and values.
 static void printSwitchCases(OpAsmPrinter &p, Operation *op,
-                             DenseI64ArrayAttr cases, RegionRange caseRegions) {
-  for (auto [value, region] : llvm::zip(cases.asArrayRef(), caseRegions)) {
+                             const ArrayAttr &cases, RegionRange caseRegions) {
+  for (auto [value, region] : llvm::zip(cases, caseRegions)) {
     p.printNewline();
-    p << "case " << value << ' ';
+    const IntegerAttr &intAttr = cast<IntegerAttr>(value);
+    p << "case " << intAttr.getAPSInt() << ' ';
     p.printRegion(*region, /*printEntryBlockArgs=*/false);
   }
+}
+
+static SmallString<64> getAPSIntStr(const APSInt &value) {
+  SmallString<64> str;
+  value.toString(str);
+  return str;
 }
 
 LogicalResult SwitchOp::verify() {
@@ -1045,10 +1057,29 @@ LogicalResult SwitchOp::verify() {
            << getCases().size() << " case values";
   }
 
-  DenseSet<int64_t> valueSet;
-  for (int64_t value : getCases())
-    if (!valueSet.insert(value).second)
-      return emitOpError("has duplicate case value: ") << value;
+  Value operand = OneOperand::getOperand();
+  const Type opType = operand.getType();
+  if (!opType.isInteger()) {
+    return emitOpError("expected an integer type");
+  }
+  const bool isSigned = opType.isSignedInteger();
+  const unsigned bitWidth = opType.getIntOrFloatBitWidth();
+  DenseSet<APSInt> valueSet;
+  for (const Attribute &attr: getCases()) {
+    const IntegerAttr intAttr = cast<IntegerAttr>(attr);
+    const APSInt value = intAttr.getAPSInt();
+    if (value.isSigned() && !isSigned) {
+      return emitOpError("expects case value to be representable by ") << (isSigned ? "si" : "ui") << bitWidth << " but got " << getAPSIntStr(value);
+    }
+    if (!valueSet.insert(value).second) {
+      return emitOpError("has duplicate case value: ") << getAPSIntStr(value);
+    }
+    // TODO: find out if value is negative and error if we are unsigned
+    const bool isRepresentable = isSigned ? value.isSignedIntN(bitWidth) : value.isIntN(bitWidth);
+    if (!isRepresentable) {
+      return emitOpError("expects case value to be representable by ") << (isSigned ? "si" : "ui") << bitWidth << " but got " << getAPSIntStr(value);
+    }
+  }
   auto verifyRegion = [&](Region &region, const Twine &name) -> LogicalResult {
     auto yield = dyn_cast<YieldOp>(region.front().back());
     if (!yield)
@@ -1121,8 +1152,10 @@ void SwitchOp::getEntrySuccessorRegions(
 
   // Otherwise, try to find a case with a matching value. If not, the
   // default region is the only successor.
-  for (auto [caseValue, caseRegion] : llvm::zip(getCases(), getCaseRegions())) {
-    if (caseValue == arg.getInt()) {
+  for (auto [caseAttr, caseRegion] : llvm::zip(getCases(), getCaseRegions())) {
+    const IntegerAttr intAttr = cast<IntegerAttr>(caseAttr);
+    const APInt caseValue = intAttr.getValue();
+    if (caseValue == arg.getValue()) {
       successors.emplace_back(&caseRegion);
       return;
     }
@@ -1140,7 +1173,10 @@ void SwitchOp::getRegionInvocationBounds(
   }
 
   unsigned liveIndex = getNumRegions() - 1;
-  const auto *it = llvm::find(getCases(), operandValue.getInt());
+  const auto it = llvm::find_if(getCases(), [&operandValue](Attribute attr){
+    const IntegerAttr intAttr = cast<IntegerAttr>(attr);
+    return intAttr.getValue() == operandValue.getValue();
+  });
   if (it != getCases().end())
     liveIndex = std::distance(getCases().begin(), it);
   for (unsigned i = 0, e = getNumRegions(); i < e; ++i)
@@ -1154,13 +1190,22 @@ struct FoldConstantCase : OpRewritePattern<SwitchOp> {
                                 PatternRewriter &rewriter) const override {
     // If `op.getArg()` is a constant, select the region that matches with
     // the constant value. Use the default region if no matche is found.
-    std::optional<int64_t> maybeCst = getConstantIntValue(op.getArg());
+    std::optional<std::pair<APInt, bool>> maybeCst = getConstantAPIntValue(op.getArg());
     if (!maybeCst.has_value())
       return failure();
-    int64_t cst = *maybeCst;
+    // index type not supported
+    if (maybeCst->second) {
+      return failure();
+    }
+    const APInt cst = maybeCst->first;
     int64_t caseIdx, e = op.getNumCases();
+    // Original code:
     for (caseIdx = 0; caseIdx < e; ++caseIdx) {
-      if (cst == op.getCases()[caseIdx])
+      const Attribute &attr = op.getCases()[caseIdx];
+      const IntegerAttr &intAttr = cast<IntegerAttr>(attr);
+      // TODO: need to check at runtime if this runs before validate
+      assert(intAttr);
+      if (cst == intAttr.getValue())
         break;
     }
 
