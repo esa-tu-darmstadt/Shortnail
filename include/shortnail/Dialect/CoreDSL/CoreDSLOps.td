@@ -695,14 +695,12 @@ def CastOp : CoreDSL_Op<"cast", [Pure]> {
 def YieldOp : CoreDSL_Op<"yield", [Pure, ReturnLike, Terminator,
     ParentOneOf<["SwitchOp"]>]> {
   let summary = "loop yield and termination operation";
-  // TODO: update description
   let description = [{
-    The `scf.yield` operation yields an SSA value from the SCF dialect op region and
-    terminates the regions. The semantics of how the values are yielded is
-    defined by the parent operation.
-    If `scf.yield` has any operands, the operands must match the parent
+    The `coredsl.yield` operation is equivalent to the `scf.yield` operation,
+    but only works for `coredsl.switch`
+    If `coredsl.yield` has any operands, the operands must match the parent
     operation's results.
-    If the parent operation defines no values, then the `scf.yield` may be
+    If the parent operation defines no values, then the `coredsl.yield` may be
     left out in the custom syntax and the builders will insert one implicitly.
     Otherwise, it has to be present in the syntax to indicate which values are
     yielded.
@@ -735,7 +733,6 @@ def SwitchOp : CoreDSL_Op<"switch", [RecursiveMemoryEffects,
 
     Example:
 
-    // TODO: fix when syntax finalized
     ```mlir
     %0 = coredsl.switch %arg0 : ui32 -> ui32
     case 2 {
