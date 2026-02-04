@@ -1021,7 +1021,8 @@ parseSwitchCases(OpAsmParser &p, ArrayAttr &cases,
   while (succeeded(p.parseOptionalKeyword("case"))) {
     APInt signlessValue;
     Region &region = *caseRegions.emplace_back(std::make_unique<Region>());
-    if (p.parseInteger(signlessValue) || p.parseRegion(region, /*arguments=*/{}))
+    if (p.parseInteger(signlessValue) ||
+        p.parseRegion(region, /*arguments=*/{}))
       return failure();
     // We can use APInt::isNegative here, because parseInteger() only sets the
     // MSB if the literal is negative
@@ -1062,22 +1063,22 @@ LogicalResult SwitchOp::verify() {
   if (!opType.isInteger()) {
     return emitOpError("expected an integer type");
   }
-  const bool isSigned = opType.isSignedInteger();
-  const unsigned bitWidth = opType.getIntOrFloatBitWidth();
+  const bool condIsSigned = opType.isSignedInteger();
+  const unsigned condBitWidth = opType.getIntOrFloatBitWidth();
   DenseSet<APSInt> valueSet;
-  for (const Attribute &attr: getCases()) {
+  for (const Attribute &attr : getCases()) {
     const IntegerAttr intAttr = cast<IntegerAttr>(attr);
     const APSInt value = intAttr.getAPSInt();
-    if (value.isSigned() && !isSigned) {
-      return emitOpError("expects case value to be representable by ") << (isSigned ? "si" : "ui") << bitWidth << " but got " << getAPSIntStr(value);
+    const bool signedValueForUnsignedCond = value.isSigned() && !condIsSigned;
+    const bool isRepresentable = condIsSigned ? value.isSignedIntN(condBitWidth)
+                                              : value.isIntN(condBitWidth);
+    if (signedValueForUnsignedCond || !isRepresentable) {
+      return emitOpError("expects case value to be representable by ")
+             << (condIsSigned ? "si" : "ui") << condBitWidth << " but got "
+             << getAPSIntStr(value);
     }
     if (!valueSet.insert(value).second) {
       return emitOpError("has duplicate case value: ") << getAPSIntStr(value);
-    }
-    // TODO: find out if value is negative and error if we are unsigned
-    const bool isRepresentable = isSigned ? value.isSignedIntN(bitWidth) : value.isIntN(bitWidth);
-    if (!isRepresentable) {
-      return emitOpError("expects case value to be representable by ") << (isSigned ? "si" : "ui") << bitWidth << " but got " << getAPSIntStr(value);
     }
   }
   auto verifyRegion = [&](Region &region, const Twine &name) -> LogicalResult {
@@ -1118,9 +1119,7 @@ LogicalResult SwitchOp::verify() {
 
 unsigned SwitchOp::getNumCases() { return getCases().size(); }
 
-Block &SwitchOp::getDefaultBlock() {
-  return getDefaultRegion().front();
-}
+Block &SwitchOp::getDefaultBlock() { return getDefaultRegion().front(); }
 
 Block &SwitchOp::getCaseBlock(unsigned idx) {
   assert(idx < getNumCases() && "case index out-of-bounds");
@@ -1173,7 +1172,7 @@ void SwitchOp::getRegionInvocationBounds(
   }
 
   unsigned liveIndex = getNumRegions() - 1;
-  const auto it = llvm::find_if(getCases(), [&operandValue](Attribute attr){
+  const auto it = llvm::find_if(getCases(), [&operandValue](Attribute attr) {
     const IntegerAttr intAttr = cast<IntegerAttr>(attr);
     return intAttr.getValue() == operandValue.getValue();
   });
@@ -1190,7 +1189,8 @@ struct FoldConstantCase : OpRewritePattern<SwitchOp> {
                                 PatternRewriter &rewriter) const override {
     // If `op.getArg()` is a constant, select the region that matches with
     // the constant value. Use the default region if no matche is found.
-    std::optional<std::pair<APInt, bool>> maybeCst = getConstantAPIntValue(op.getArg());
+    std::optional<std::pair<APInt, bool>> maybeCst =
+        getConstantAPIntValue(op.getArg());
     if (!maybeCst.has_value())
       return failure();
     // index type not supported
@@ -1226,7 +1226,7 @@ struct FoldConstantCase : OpRewritePattern<SwitchOp> {
 };
 
 void SwitchOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                MLIRContext *context) {
+                                           MLIRContext *context) {
   results.add<FoldConstantCase>(context);
 }
 
