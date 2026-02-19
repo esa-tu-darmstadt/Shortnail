@@ -850,9 +850,12 @@ except:
   pass
 
 def read_mem(addr):
-  return machine.SystemBus.ReadByte(addr)
+  data = machine.SystemBus.ReadByte(addr)
+  print("READ from 0x{:08X} = 0x{:02X}".format(addr, int(data)))
+  return data
 def write_mem(addr, data):
   machine.SystemBus.WriteByte(addr, data)
+  print("WRITE to 0x{:08X} = 0x{:02X}".format(addr, data))
 
 def read_pc():
   return cpu.PC.RawValue
