@@ -19,10 +19,36 @@ The YAML is consumed by the Python patch generator (gen_patches.py).
 
 _Transpile CoreDSL to Python._
 
-TODO
+Transpiles a `coredsl.isax` operation into a Python module suitable for use
+as a cocotb simulation model. Each instruction is emitted as a Python
+function that mirrors the CoreDSL behavior using bitwise operations on
+Python integers.
+
+CoreDSL operations (`coredsl.get`, `coredsl.set`, `coredsl.cast`,
+`coredsl.bitextract`, `coredsl.concat`, bitwise/shift/arithmetic ops) and
+`hwarith` operations are translated to their Python equivalents with
+explicit bit-width masking. Control flow (`scf.if`, `scf.for`) is lowered
+to Python `if`/`for` statements.
+
+Register and address space accesses are emitted as method calls on a
+simulation context object, enabling the generated Python to interface with
+the cocotb testbench infrastructure.
 
 ### `-merge-multiple-isaxes`
 
 _Merge multiple MLIR CoreDSL files_
 
-TODO
+Merges multiple `coredsl.isax` operations within a module into a single
+unified `coredsl.isax` named "merged".
+
+Shared architectural state (core_x registers, core_pc, core_fp, core_mem
+address spaces) is deduplicated — one canonical declaration is kept and all
+references are remapped. The pass asserts that shared state elements have
+matching types and sizes across ISAXes.
+
+ISAX-private state (local registers, aliases, helper functions) is prefixed
+with "MERGED{N}" (where N is a per-ISAX index) to avoid name collisions,
+then moved into the merged ISAX. Instructions and always-blocks are moved
+directly.
+
+If only a single `coredsl.isax` is present, the pass is a no-op.
