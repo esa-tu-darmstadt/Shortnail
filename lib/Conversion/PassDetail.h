@@ -9,17 +9,15 @@
 #ifndef CONVERSION_PASSDETAIL_H
 #define CONVERSION_PASSDETAIL_H
 
-#include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
+#include "circt/Dialect/HWArith/HWArithDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
+#include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 
 namespace circt {
 namespace hw {
 class HWDialect;
 } // namespace hw
-
-namespace hwarith {
-class HWArithDialect;
-} // namespace hwarith
 
 namespace comb {
 class CombDialect;
