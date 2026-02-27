@@ -9,6 +9,7 @@
 #ifndef SHORTNAIL_CONVERSION_PASSES_H
 #define SHORTNAIL_CONVERSION_PASSES_H
 
+#include "shortnail/Conversion/AnalyzeISAX.h"
 #include "shortnail/Conversion/CoreDSLToPy.h"
 #include "shortnail/Conversion/MergeISAX.h"
 

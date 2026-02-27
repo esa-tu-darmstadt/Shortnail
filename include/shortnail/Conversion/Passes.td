@@ -36,4 +36,24 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
   ];
 }
 
+def AnalyzeISAX : Pass<"analyze-isax", "mlir::ModuleOp"> {
+  let summary = "Analyze CoreDSL ISAX MLIR and output structured YAML";
+  let description = [{
+    Analyzes CoreDSL MLIR (ShortNail dialect) and outputs a structured YAML
+    description of each ISAX instruction's encoding, operand semantics, and
+    side effects. Expects exactly one coredsl.ISAXOp in the module.
+    The YAML is consumed by the Python patch generator (gen_patches.py).
+  }];
+  let constructor = "::mlir::shortnail::createAnalyzeISAXPass()";
+  let dependentDialects = [
+    "::mlir::coredsl::CoreDSLDialect",
+    "::circt::hwarith::HWArithDialect",
+    "::mlir::func::FuncDialect"
+  ];
+  let options = [
+    Option<"outputPath", "output", "std::string", /*default=*/"\"\"",
+           "Output path for the YAML analysis file">
+  ];
+}
+
 #endif // SHORTNAIL_CONVERSION_PASSES_TD
