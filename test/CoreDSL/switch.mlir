@@ -109,4 +109,26 @@ coredsl.isax "SWITCH_TEST" {
     coredsl.set @X[%rs1 : ui5] = %3 : ui32
     coredsl.end
   }
+
+  coredsl.instruction @CONST_CASE_FOLD_LARGER_THAN_64BIT("000000", %isSigned : ui1, %rs2 : ui5, %rs1 : ui5,
+                               "000", %rd : ui5, "0101011") {
+    // CHECK: %[[RES:.*]] = hwarith.constant 54 : ui32
+    // CHECK: coredsl.set @X[%rs1 : ui5] = %[[RES]] : ui32
+    %2 = hwarith.constant 36893488147419103232 : ui128
+    %3 = coredsl.switch %2 : ui128 -> ui32
+      case 0 {
+        %3 = hwarith.constant 2 : ui32
+        coredsl.yield %3 : ui32
+      }
+      case 36893488147419103232 {
+        %3 = hwarith.constant 54 : ui32
+        coredsl.yield %3 : ui32
+      }
+      default {
+        %3 = hwarith.constant 3 : ui32
+        coredsl.yield %3 : ui32
+      }
+    coredsl.set @X[%rs1 : ui5] = %3 : ui32
+    coredsl.end
+  }
 }
