@@ -45,7 +45,25 @@ coredsl.isax "SWITCH_TEST" {
   }
 
   coredsl.instruction @NO_ERROR_SIGNED_INT("000000", %isSigned : ui1, %rs2 : ui5, %rs1 : ui5,
-                               "000", %rd : ui5, "0101011") {
+                               "000", %rd : ui5, "0101011") {    
+    // CHECK: %[[RES_0:.*]] = hwarith.constant 54 : ui32
+    // CHECK: %[[RES_1:.*]] = hwarith.constant 2 : ui32
+    // CHECK: %[[RES_2:.*]] = hwarith.constant 3 : ui32
+    // CHECK: %[[READ_VAL:.*]] = coredsl.get @X[%rs1 : ui5] : ui32
+    // CHECK: %[[COND_UI32:.*]] = coredsl.get @X[%rs2 : ui5] : ui32
+    // CHECK: %[[COND:.*]] = coredsl.cast %[[COND_UI32]] : ui32 to si8
+    // CHECK: %[[COND_RES:.*]] = coredsl.switch %[[COND]] : si8 -> ui32
+    // CHECK:   case 0 {
+    // CHECK:     coredsl.yield %[[RES_1]] : ui32
+    // CHECK:   }
+    // CHECK:   case -1 {
+    // CHECK:     coredsl.yield %[[RES_0]] : ui32
+    // CHECK:   }
+    // CHECK:   default {
+    // CHECK:     coredsl.yield %[[RES_2]] : ui32
+    // CHECK:   }
+    // CHECK: coredsl.set @X[%rs1 : ui5] = %[[COND_RES]] : ui32
+
     %0 = coredsl.get @X[%rs1 : ui5] : ui32
     %1 = coredsl.get @X[%rs2 : ui5] : ui32
     %2 = coredsl.cast %1 : ui32 to si8
