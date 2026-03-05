@@ -83,4 +83,30 @@ coredsl.isax "SWITCH_TEST" {
     coredsl.set @X[%rs1 : ui5] = %3 : ui32
     coredsl.end
   }
+
+  coredsl.instruction @CONST_CASE_FOLD("000000", %isSigned : ui1, %rs2 : ui5, %rs1 : ui5,
+                               "000", %rd : ui5, "0101011") {
+    // CHECK: %[[RES:.*]] = hwarith.constant 54 : ui32
+    // CHECK: %[[LOADED_0:.*]] = coredsl.get @X[%rs1 : ui5] : ui32
+    // CHECK: %[[LOADED_1:.*]] = coredsl.get @X[%rs2 : ui5] : ui32
+    // CHECK: coredsl.set @X[%rs1 : ui5] = %[[RES]] : ui32
+    %0 = coredsl.get @X[%rs1 : ui5] : ui32
+    %1 = coredsl.get @X[%rs2 : ui5] : ui32
+    %2 = hwarith.constant -1 : si8
+    %3 = coredsl.switch %2 : si8 -> ui32
+      case 0 {
+        %3 = hwarith.constant 2 : ui32
+        coredsl.yield %3 : ui32
+      }
+      case -1 {
+        %3 = hwarith.constant 54 : ui32
+        coredsl.yield %3 : ui32
+      }
+      default {
+        %3 = hwarith.constant 3 : ui32
+        coredsl.yield %3 : ui32
+      }
+    coredsl.set @X[%rs1 : ui5] = %3 : ui32
+    coredsl.end
+  }
 }
