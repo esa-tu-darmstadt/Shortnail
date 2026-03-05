@@ -1205,7 +1205,9 @@ struct FoldConstantCase : OpRewritePattern<SwitchOp> {
       const IntegerAttr &intAttr = cast<IntegerAttr>(attr);
       // TODO: need to check at runtime if this runs before validate
       assert(intAttr);
-      if (cst == intAttr.getValue())
+      // TODO: intAttr.getValue() seems to be 64 bit. Will this still work with a constant > 2^64 - 1
+      const APInt attrVal = intAttr.getValue().sextOrTrunc(cst.getBitWidth());
+      if (cst == attrVal)
         break;
     }
 
