@@ -1,7 +1,8 @@
-// RUN: shortnail-opt %s | shortnail-opt | FileCheck %s
+// RUN: shortnail-opt %s -canonicalize -split-input-file -verify-diagnostics | shortnail-opt | FileCheck %s
 
-// TODO: rename
-coredsl.isax "X_ALT_MAC" {
+coredsl.isax "SWITCH_TEST" {
+// CHECK: coredsl.register core_x @X[32] : ui32
+// CHECK: coredsl.register local @ACC : ui64
   coredsl.register core_x @X[32] : ui32
   coredsl.register local @ACC : ui64
 
@@ -10,6 +11,22 @@ coredsl.isax "X_ALT_MAC" {
                                "000", %rd : ui5, "0101011") {
     %0 = coredsl.get @X[%rs1 : ui5] : ui32
     %1 = coredsl.get @X[%rs2 : ui5] : ui32
+    // CHECK: %[[VAL_1:.*]] = hwarith.constant 54 : ui32
+    // CHECK: %[[VAL_0:.*]] = hwarith.constant 2 : ui32
+    // CHECK: %[[VAL_2:.*]] = hwarith.constant 3 : ui32
+    // CHECK: %[[LOADED_0:.*]] = coredsl.get @X[%rs1 : ui5] : ui32
+    // CHECK: %[[LOADED_1:.*]] = coredsl.get @X[%rs2 : ui5] : ui32
+    // CHECK: %[[RES:.*]] = coredsl.switch %[[COND:.*]] : ui32 -> ui32
+    // CHECK: case 0 {
+    // CHECK: coredsl.yield %[[VAL_0]] : ui32
+    // CHECK: }
+    // CHECK: case 2 {
+    // CHECK: coredsl.yield %[[VAL_1]] : ui32
+    // CHECK: }
+    // CHECK: default {
+    // CHECK: coredsl.yield %[[VAL_2]] : ui32
+    // CHECK: }
+    // CHECK: coredsl.set @X[%rs1 : ui5] = %[[RES]] : ui32
     %2 = coredsl.switch %1 : ui32 -> ui32
       case 0 {
         %2 = hwarith.constant 2 : ui32
@@ -23,6 +40,7 @@ coredsl.isax "X_ALT_MAC" {
         %2 = hwarith.constant 3 : ui32
         coredsl.yield %2 : ui32
       }
+    coredsl.set @X[%rs1 : ui5] = %2 : ui32
     coredsl.end
   }
 
@@ -44,6 +62,7 @@ coredsl.isax "X_ALT_MAC" {
         %3 = hwarith.constant 3 : ui32
         coredsl.yield %3 : ui32
       }
+    coredsl.set @X[%rs1 : ui5] = %3 : ui32
     coredsl.end
   }
 }
