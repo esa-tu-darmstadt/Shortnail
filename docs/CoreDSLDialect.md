@@ -849,6 +849,72 @@ Traits: `HasParent<InstructionOp>`, `NoRegionArguments`, `SingleBlock`, `Termina
 
 
 
+### `coredsl.switch` (coredsl::SwitchOp)
+
+_Switch-case operation on an index argument_
+
+Syntax:
+
+```
+operation ::= `coredsl.switch` $arg attr-dict `:` type($arg) (`->` type($results)^)?
+              custom<SwitchCases>($cases, $caseRegions) `\n`
+              `` `default` $defaultRegion
+```
+
+`coredsl.switch` is a modified version of `scf.index_switch` that branches
+to one of the given regions based on the values of the argument and the
+cases. As opposed to `scf.index_switch`, this operation accepts any integer
+as argument.
+
+The operation always has a "default" region and any number of case regions
+denoted by integer constants. Control-flow transfers to the case region
+whose constant value equals the value of the argument. If the argument does
+not equal any of the case values, control-flow transfer to the "default"
+region.
+
+Example:
+
+```mlir
+%0 = coredsl.switch %arg0 : ui32 -> ui32
+case 2 {
+  %1 = hwarith.constant 10 : ui32
+  coredsl.yield %1 : ui32
+}
+case 5 {
+  %2 = hwarith.constant 20 : ui32
+  coredsl.yield %2 : ui32
+}
+default {
+  %3 = hwarith.constant 30 : ui32
+  coredsl.yield %3 : ui32
+}
+```
+
+Traits: `RecursiveMemoryEffects`, `SingleBlockImplicitTerminator<coredsl::YieldOp>`, `SingleBlock`
+
+Interfaces: `RegionBranchOpInterface`
+
+#### Attributes:
+
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>cases</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
+</table>
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `arg` | integer |
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `results` | variadic of any type |
+
+
+
 ### `coredsl.xor` (coredsl::XorOp)
 
 _Bitwise XOR operator._
@@ -887,6 +953,39 @@ Effects: `MemoryEffects::Effect{}`
 | Result | Description |
 | :----: | ----------- |
 | `result` | an arbitrary precision integer with signedness semantics |
+
+
+
+### `coredsl.yield` (coredsl::YieldOp)
+
+_Loop yield and termination operation_
+
+Syntax:
+
+```
+operation ::= `coredsl.yield` attr-dict ($results^ `:` type($results))?
+```
+
+The `coredsl.yield` operation is equivalent to the `scf.yield` operation,
+but only works for `coredsl.switch`
+If `coredsl.yield` has any operands, the operands must match the parent
+operation's results.
+If the parent operation defines no values, then the `coredsl.yield` may be
+left out in the custom syntax and the builders will insert one implicitly.
+Otherwise, it has to be present in the syntax to indicate which values are
+yielded.
+
+Traits: `AlwaysSpeculatableImplTrait`, `HasParent<SwitchOp>`, `ReturnLike`, `Terminator`
+
+Interfaces: `ConditionallySpeculatable`, `NoMemoryEffect (MemoryEffectOpInterface)`, `RegionBranchTerminatorOpInterface`
+
+Effects: `MemoryEffects::Effect{}`
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `results` | variadic of any type |
 
 
 
