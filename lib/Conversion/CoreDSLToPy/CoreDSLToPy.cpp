@@ -507,25 +507,22 @@ static WalkResult emitCoreDSLOp(mlir::raw_indented_ostream &os, Operation *op) {
             if (res.wasInterrupted())
               return res;
             os.unindent();
-            // TODO: We probably need to create an ArbInt
-            SmallString<32> str;
             bool first = true;
             for (const auto &[idx, attr] : llvm::enumerate(switchOp.getCases())) {
               const IntegerAttr &intAttr = cast<IntegerAttr>(attr);
-              const APInt &caseVal = intAttr.getValue();
+              const APInt &caseValAPInt = intAttr.getValue();
+              const unsigned bitWidth = switchOp.getArg().getType().getWidth();
+              const auto signedness = switchOp.getArg().getType().getSignedness();
+              assert(signedness != IntegerType::Signless);
+              const APSInt caseVal = APSInt(caseValAPInt.sextOrTrunc(bitWidth), signedness == IntegerType::Signed);
               if (first)
                 os << "if ";
               else
                 os << "elif ";
               first = false;
               valToPy(os, switchOp.getArg());
-              os << " == ";
-              if (caseVal.isNegative()) {
-                caseVal.toStringSigned(str);
-              } else {
-                caseVal.toStringUnsigned(str);
-              }
-              os << str << ":\n";
+              os << "." << hwarith::ICmpPredicate::eq << "(";
+              os << intToPy(caseVal) << "):\n";
               os.indent();
               if (switchOp.getNumResults() > 0) {
                 bool first = true;
@@ -540,7 +537,6 @@ static WalkResult emitCoreDSLOp(mlir::raw_indented_ostream &os, Operation *op) {
               }
               os << "helper_function_coredsl_switch_" << switchId << "_case_" << idx << "()\n";
               os.unindent();
-              str.clear();
             }
             os << "else:\n";
             os.indent();
