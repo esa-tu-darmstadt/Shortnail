@@ -507,6 +507,7 @@ static WalkResult emitCoreDSLOp(mlir::raw_indented_ostream &os, Operation *op) {
             if (res.wasInterrupted())
               return res;
             os.unindent();
+            // TODO: We probably need to create an ArbInt
             SmallString<32> str;
             bool first = true;
             for (const auto &[idx, attr] : llvm::enumerate(switchOp.getCases())) {
@@ -539,6 +540,7 @@ static WalkResult emitCoreDSLOp(mlir::raw_indented_ostream &os, Operation *op) {
               }
               os << "helper_function_coredsl_switch_" << switchId << "_case_" << idx << "()\n";
               os.unindent();
+              str.clear();
             }
             os << "else:\n";
             os.indent();
@@ -555,7 +557,8 @@ static WalkResult emitCoreDSLOp(mlir::raw_indented_ostream &os, Operation *op) {
             }
             os << "helper_function_coredsl_switch_" << switchId << "_default_case()\n";
             os.unindent();
-            return WalkResult::advance();
+            // Skip the child scopes, as we already visited them
+            return WalkResult::skip();
           })
       .Case<coredsl::YieldOp>([&](coredsl::YieldOp yieldOp) {
             return emitYieldOp(os, yieldOp);
