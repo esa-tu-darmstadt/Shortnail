@@ -1205,7 +1205,7 @@ struct FoldConstantCase : OpRewritePattern<SwitchOp> {
       const IntegerAttr &intAttr = cast<IntegerAttr>(attr);
       // TODO: need to check at runtime if this runs before validate
       assert(intAttr);
-      const APInt attrVal = intAttr.getValue().sextOrTrunc(cst.getBitWidth());
+      const APSInt attrVal = intAttr.getAPSInt().extOrTrunc(cst.getBitWidth());
       if (cst == attrVal)
         break;
     }
