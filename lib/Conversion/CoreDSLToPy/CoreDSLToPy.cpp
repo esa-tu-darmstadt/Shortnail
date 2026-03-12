@@ -903,7 +903,7 @@ def init_cust_regs():
     os.unindent();
 
     for (auto rom : roms) {
-      os << ROM_PREFIX << rom.getSymName() << " : list = [";
+      os << ROM_PREFIX << rom.getSymName() << " = [";
 
       ArrayAttr initializer = rom.getInitializerAttr();
       bool regIsSigned = cast<IntegerType>(rom.getRegType()).isSigned();
