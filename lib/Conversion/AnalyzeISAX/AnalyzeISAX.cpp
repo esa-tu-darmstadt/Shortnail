@@ -13,12 +13,12 @@
 
 #include "circt/Dialect/HWArith/HWArithDialect.h"
 
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 
 using namespace mlir;
@@ -288,6 +288,9 @@ struct InstructionInfo {
   std::string name;
   std::string mask;
   bool isJump = false;
+  bool clobbersAllRegs = false; // true when GPR write index is unresolvable
+  llvm::DenseSet<unsigned>
+      specificClobbers; // register indices for known-constant writes
   enum SideEffects {
     NoSideEffect,
     ReadOnly,
@@ -376,6 +379,42 @@ static void analyzeField(BlockArgument blockArg, coredsl::ISAXOp isaxOp,
     fi.isSigned = isSignedImmediate(blockArg);
 }
 
+/// Returns true only if v traces to a single BlockArgument from the
+/// instruction's entry block (an encoding field) through single-operand ops
+/// (casts, truncations, etc.).  Any multi-operand op (e.g. concat), constant
+/// leaf, or non-entry block argument (loop IV) returns false.
+static bool traceToSingleInstructionArg(Value v,
+                                        coredsl::InstructionOp instOp) {
+  Block &entryBlock = instOp.getRegion().front();
+  while (true) {
+    if (auto arg = dyn_cast<BlockArgument>(v))
+      return arg.getParentBlock() == &entryBlock;
+    Operation *defOp = v.getDefiningOp();
+    if (!defOp || defOp->getNumOperands() != 1)
+      return false; // constant, multi-operand op, or no def
+    v = defOp->getOperand(0);
+  }
+}
+
+/// Try to evaluate v as a compile-time constant integer.
+/// Matches any ConstantLike op (hw.constant, arith.constant, hwarith.constant)
+/// via matchPattern/m_ConstantInt, and threads through single-operand cast-like
+/// ops (casts, truncations).  Multi-operand ops return false.
+static bool tryFoldToConstant(Value v, uint64_t &result) {
+  while (true) {
+    llvm::APInt constVal;
+    if (mlir::matchPattern(v, mlir::m_ConstantInt(&constVal))) {
+      result = constVal.getZExtValue();
+      return true;
+    }
+    Operation *defOp = v.getDefiningOp();
+    if (!defOp || defOp->getNumOperands() != 1)
+      return false;
+    v = defOp->getOperand(0);
+  }
+  return false;
+}
+
 /// Analyze side effects and jump status of an instruction.
 static void analyzeSideEffects(coredsl::InstructionOp instOp,
                                coredsl::ISAXOp isaxOp, InstructionInfo &info) {
@@ -420,6 +459,42 @@ static void analyzeSideEffects(coredsl::InstructionOp instOp,
       if (auto regOp = dyn_cast_or_null<coredsl::RegisterOp>(sym)) {
         if (regOp.getAccessMode() == coredsl::RegisterAccessMode::core_pc)
           info.isJump = true;
+      }
+      // GPR/FP write whose index is not fully from encoding fields
+      if (auto regOp = dyn_cast_or_null<coredsl::RegisterOp>(sym)) {
+        auto mode = regOp.getAccessMode();
+        if (mode == coredsl::RegisterAccessMode::core_x ||
+            mode == coredsl::RegisterAccessMode::core_fp) {
+          // Determine offset range from from/to attributes.
+          unsigned lo = 0, hi = 0;
+          if (auto from = setOp.getFrom()) {
+            lo = hi = from->getZExtValue();
+            if (auto to = setOp.getTo()) {
+              unsigned toVal = to->getZExtValue();
+              lo = std::min(lo, toVal);
+              hi = std::max(hi, toVal);
+            }
+          }
+
+          // Resolve the base index (if present).
+          unsigned baseIdx = 0;
+          if (setOp.getBase()) {
+            if (!setOp.getFrom() &&
+                traceToSingleInstructionArg(setOp.getBase(), instOp))
+              return; // encoding field — handled by field analysis
+
+            uint64_t val;
+            if (tryFoldToConstant(setOp.getBase(), val))
+              baseIdx = static_cast<unsigned>(val);
+            else {
+              info.clobbersAllRegs = true;
+              return;
+            }
+          }
+
+          for (unsigned r = lo; r <= hi; ++r)
+            info.specificClobbers.insert(baseIdx + r);
+        }
       }
     }
   });
@@ -554,6 +629,20 @@ static void writeYAML(const ISAXInfo &isax, mlir::raw_indented_ostream &os) {
       break;
     }
     os << "  side_effects: \"" << seStr << "\"\n";
+    if (inst.clobbersAllRegs)
+      os << "  clobbers_all_regs: true\n";
+    else if (!inst.specificClobbers.empty()) {
+      SmallVector<unsigned> regs(inst.specificClobbers.begin(),
+                                 inst.specificClobbers.end());
+      llvm::sort(regs);
+      os << "  clobbers_regs: [";
+      for (unsigned i = 0; i < regs.size(); ++i) {
+        if (i > 0)
+          os << ", ";
+        os << "\"x" << regs[i] << "\"";
+      }
+      os << "]\n";
+    }
 
     os << "  fields:\n";
     for (const auto &f : inst.fields) {
@@ -635,6 +724,28 @@ struct AnalyzeISAXPass : public shortnail::AnalyzeISAXBase<AnalyzeISAXPass> {
     }
 
     auto isaxOp = isaxOps[0];
+
+    // Unroll all scf::ForOp loops with constant bounds once, globally, so that
+    // per-iteration GPR writes become individually visible as constant-index
+    // writes.  loopUnrollFull silently fails for non-constant-bounded loops.
+    {
+      SmallVector<scf::ForOp> loops;
+      isaxOp.walk([&](scf::ForOp forOp) { loops.push_back(forOp); });
+      for (auto forOp : loops)
+        (void)mlir::loopUnrollFull(forOp);
+    }
+
+    // CSE + Canonicalize to simplify unrolled IV arithmetic (e.g. fold
+    // arith.addi(0, N) → arith.constant N) so tryFoldToConstant can identify
+    // concrete register indices.
+    {
+      PassManager pm(isaxOp->getContext());
+      pm.addPass(createCSEPass());
+      pm.addPass(createCanonicalizerPass());
+      if (failed(pm.run(isaxOp)))
+        return signalPassFailure();
+    }
+
     ISAXInfo isax;
     isax.name = cleanName(isaxOp.getName());
 

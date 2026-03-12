@@ -7,6 +7,9 @@ add_shortnail_library(ShortnailAnalyzeISAX
     LINK_LIBS PUBLIC
     MLIRIR
     MLIRPass
+    MLIRSCFDialect
+    MLIRSCFUtils
+    MLIRTransforms
     LLVMSupport
 
     ShortnailCoreDSL
