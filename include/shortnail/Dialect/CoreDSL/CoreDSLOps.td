@@ -685,4 +685,92 @@ def CastOp : CoreDSL_Op<"cast", [Pure]> {
   let hasVerifier = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// YieldOp
+//===----------------------------------------------------------------------===//
+
+def YieldOp : CoreDSL_Op<"yield", [Pure, ReturnLike, Terminator,
+    ParentOneOf<["SwitchOp"]>]> {
+  let summary = "loop yield and termination operation";
+  let description = [{
+    The `coredsl.yield` operation is equivalent to the `scf.yield` operation,
+    but only works for `coredsl.switch`
+    If `coredsl.yield` has any operands, the operands must match the parent
+    operation's results.
+    If the parent operation defines no values, then the `coredsl.yield` may be
+    left out in the custom syntax and the builders will insert one implicitly.
+    Otherwise, it has to be present in the syntax to indicate which values are
+    yielded.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$results);
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
+  let assemblyFormat =
+      [{  attr-dict ($results^ `:` type($results))? }];
+}
+
+def SwitchOp : CoreDSL_Op<"switch", [RecursiveMemoryEffects,
+    SingleBlockImplicitTerminator<"coredsl::YieldOp">,
+    DeclareOpInterfaceMethods<RegionBranchOpInterface,
+                              ["getRegionInvocationBounds",
+                               "getEntrySuccessorRegions"]>]> {
+  let summary = "switch-case operation on arbitrary integers";
+  let description = [{
+    `coredsl.switch` is a modified version of `scf.index_switch` that branches
+    to one of the given regions based on the values of the argument and the
+    cases. As opposed to `scf.index_switch`, this operation accepts any integer
+    as argument.
+
+    The operation always has a "default" region and any number of case regions
+    denoted by integer constants. Control-flow transfers to the case region
+    whose constant value equals the value of the argument. If the argument does
+    not equal any of the case values, control-flow transfer to the "default"
+    region.
+
+    Example:
+
+    ```mlir
+    %0 = coredsl.switch %arg0 : ui32 -> ui32
+    case 2 {
+      %1 = hwarith.constant 10 : ui32
+      coredsl.yield %1 : ui32
+    }
+    case 5 {
+      %2 = hwarith.constant 20 : ui32
+      coredsl.yield %2 : ui32
+    }
+    default {
+      %3 = hwarith.constant 30 : ui32
+      coredsl.yield %3 : ui32
+    }
+    ```
+  }];
+
+  let arguments = (ins AnyInteger:$arg, ArrayAttr:$cases);
+  let results = (outs Variadic<AnyType>:$results);
+  let regions = (region SizedRegion<1>:$defaultRegion,
+                        VariadicRegion<SizedRegion<1>>:$caseRegions);
+
+  let assemblyFormat = [{
+    $arg attr-dict `:` type($arg) (`->` type($results)^)?
+    custom<SwitchCases>($cases, $caseRegions) `\n`
+    `` `default` $defaultRegion
+  }];
+
+  let extraClassDeclaration = [{
+    /// Get the number of cases.
+    unsigned getNumCases();
+
+    /// Get the default region body.
+    Block &getDefaultBlock();
+
+    /// Get the body of a case region.
+    Block &getCaseBlock(unsigned idx);
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasVerifier = 1;
+}
+
 #endif // SHORTNAIL_DIALECT_COREDSL_COREDSLOPS_TD

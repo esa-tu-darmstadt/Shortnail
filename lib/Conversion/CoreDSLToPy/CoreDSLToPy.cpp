@@ -153,8 +153,26 @@ handleWordWiseAccess(Op op,
   }
 }
 
+// Handles both scf::YieldOp and coredsl::YieldOp, as their handling is
+// identical
+template <typename YieldOp>
+static WalkResult emitYieldOp(mlir::raw_indented_ostream &os, YieldOp yieldOp) {
+  os << "return ";
+  bool first = true;
+  for (auto res : yieldOp.getResults()) {
+    if (!first)
+      os << ", ";
+
+    valToPy(os, res);
+    first = false;
+  }
+  os << "\n";
+  return WalkResult::advance();
+}
+
 static WalkResult emitCoreDSLOp(mlir::raw_indented_ostream &os, Operation *op) {
   assert(isa<coredsl::CoreDSLDialect>(op->getDialect()));
+  static unsigned uniqueSwitchNumber = 0;
 
   return TypeSwitch<Operation *, WalkResult>(op)
       .Case<coredsl::SetOp>([&](auto setOp) {
@@ -468,6 +486,86 @@ static WalkResult emitCoreDSLOp(mlir::raw_indented_ostream &os, Operation *op) {
            << (targetType.isSigned() ? "True" : "False") << ")\n";
         return WalkResult::advance();
       })
+      .Case<coredsl::SwitchOp>([&](coredsl::SwitchOp switchOp) {
+        const unsigned switchId = uniqueSwitchNumber++;
+        for (unsigned i = 0, end = switchOp.getNumCases(); i < end; ++i) {
+          Block &caseBlock = switchOp.getCaseBlock(i);
+          // Emit each case as a helper function. This way each
+          // switch has the form
+          // 'ret1, ret2, ..., retn = helper_function', thereby
+          // making handling of the results easier and allowing
+          // us to just emit a return for every yield op
+          os << "def helper_function_coredsl_switch_" << switchId << "_case_"
+             << i << "():\n";
+          os.indent();
+          auto res = caseBlock.template walk<WalkOrder::PreOrder>(
+              [&os](Operation *op) { return emitOp(os, op); });
+          if (res.wasInterrupted())
+            return res;
+          os.unindent();
+        }
+        os << "def helper_function_coresl_switch_" << switchId
+           << "_default_case():\n";
+        os.indent();
+        auto res = switchOp.getDefaultBlock().walk<WalkOrder::PreOrder>(
+            [&os](Operation *op) { return emitOp(os, op); });
+        if (res.wasInterrupted())
+          return res;
+        os.unindent();
+        bool first = true;
+        for (const auto &[idx, attr] : llvm::enumerate(switchOp.getCases())) {
+          const IntegerAttr &intAttr = cast<IntegerAttr>(attr);
+          const APInt &caseValAPInt = intAttr.getValue();
+          const unsigned bitWidth = switchOp.getArg().getType().getWidth();
+          const auto signedness = switchOp.getArg().getType().getSignedness();
+          assert(signedness != IntegerType::Signless);
+          const APSInt caseVal = APSInt(caseValAPInt.sextOrTrunc(bitWidth),
+                                        signedness == IntegerType::Signed);
+          if (first)
+            os << "if ";
+          else
+            os << "elif ";
+          first = false;
+          valToPy(os, switchOp.getArg());
+          os << "." << hwarith::ICmpPredicate::eq << "(";
+          os << intToPy(caseVal) << "):\n";
+          os.indent();
+          if (switchOp.getNumResults() > 0) {
+            bool first = true;
+            for (auto res : switchOp.getResults()) {
+              if (!first) {
+                os << ", ";
+              }
+              first = false;
+              valToPy(os, res);
+            }
+            os << " = ";
+          }
+          os << "helper_function_coredsl_switch_" << switchId << "_case_" << idx
+             << "()\n";
+          os.unindent();
+        }
+        os << "else:\n";
+        os.indent();
+        if (switchOp.getNumResults() > 0) {
+          bool first = true;
+          for (auto res : switchOp.getResults()) {
+            if (!first) {
+              os << ", ";
+            }
+            first = false;
+            valToPy(os, res);
+          }
+          os << " = ";
+        }
+        os << "helper_function_coredsl_switch_" << switchId
+           << "_default_case()\n";
+        os.unindent();
+        // Skip the child scopes, as we already visited them
+        return WalkResult::skip();
+      })
+      .Case<coredsl::YieldOp>(
+          [&](coredsl::YieldOp yieldOp) { return emitYieldOp(os, yieldOp); })
       .Default([&](auto _) {
         op->emitError() << "CoreDSLToPy::emitCoreDSLOp lacks emission code for "
                            "this operation!";
@@ -646,19 +744,8 @@ static WalkResult emitSCFOp(mlir::raw_indented_ostream &os, Operation *op) {
 
         return WalkResult::skip();
       })
-      .Case<scf::YieldOp>([&](auto yieldOp) {
-        os << "return ";
-        bool first = true;
-        for (auto res : yieldOp.getResults()) {
-          if (!first)
-            os << ", ";
-
-          valToPy(os, res);
-          first = false;
-        }
-        os << "\n";
-        return WalkResult::advance();
-      })
+      .Case<scf::YieldOp>(
+          [&](auto yieldOp) { return emitYieldOp(os, yieldOp); })
       // .Case<scf::WhileOp>([&](auto whileOp) {
       //   // TODO PITA
       //   return WalkResult::interrupt();

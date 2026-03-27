@@ -13,9 +13,13 @@
 #include "circt/Dialect/HWArith/HWArithOps.h"
 #include "circt/Dialect/HWArith/HWArithTypes.h"
 
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OpImplementation.h"
+
+#include "llvm/ADT/APSInt.h"
+#include "llvm/Support/Debug.h"
 
 using namespace circt::hwarith;
 
@@ -1034,6 +1038,228 @@ LogicalResult CastOp::verify() {
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// SwitchOp
+//===----------------------------------------------------------------------===//
+
+/// Parse the case regions and values.
+static ParseResult
+parseSwitchCases(OpAsmParser &p, ArrayAttr &cases,
+                 SmallVectorImpl<std::unique_ptr<Region>> &caseRegions) {
+  SmallVector<Attribute> caseValues;
+  while (succeeded(p.parseOptionalKeyword("case"))) {
+    APInt signlessValue;
+    Region &region = *caseRegions.emplace_back(std::make_unique<Region>());
+    if (p.parseInteger(signlessValue) ||
+        p.parseRegion(region, /*arguments=*/{}))
+      return failure();
+    // We can use APInt::isNegative here, because parseInteger() only sets the
+    // MSB if the literal is negative
+    APSInt signedValue{signlessValue, !signlessValue.isNegative()};
+    IntegerAttr attr = IntegerAttr::get(p.getContext(), signedValue);
+    caseValues.push_back(attr);
+  }
+  cases = ArrayAttr::get(p.getContext(), caseValues);
+  return success();
+}
+
+/// Print the case regions and values.
+static void printSwitchCases(OpAsmPrinter &p, Operation *op,
+                             const ArrayAttr &cases, RegionRange caseRegions) {
+  for (auto [value, region] : llvm::zip(cases, caseRegions)) {
+    p.printNewline();
+    const IntegerAttr &intAttr = cast<IntegerAttr>(value);
+    p << "case " << intAttr.getAPSInt() << ' ';
+    p.printRegion(*region, /*printEntryBlockArgs=*/false);
+  }
+}
+
+static SmallString<64> getAPSIntStr(const APSInt &value) {
+  SmallString<64> str;
+  value.toString(str);
+  return str;
+}
+
+LogicalResult SwitchOp::verify() {
+  if (getCases().size() != getCaseRegions().size()) {
+    return emitOpError("has ")
+           << getCaseRegions().size() << " case regions but "
+           << getCases().size() << " case values";
+  }
+
+  Value operand = OneOperand::getOperand();
+  const Type opType = operand.getType();
+  if (!opType.isInteger()) {
+    return emitOpError("expected an integer type");
+  }
+  const bool condIsSigned = opType.isSignedInteger();
+  const unsigned condBitWidth = opType.getIntOrFloatBitWidth();
+  DenseSet<APSInt> valueSet;
+  for (const Attribute &attr : getCases()) {
+    const IntegerAttr intAttr = cast<IntegerAttr>(attr);
+    const APSInt value = intAttr.getAPSInt();
+    const bool signedValueForUnsignedCond = value.isSigned() && !condIsSigned;
+    const bool isRepresentable = condIsSigned ? value.isSignedIntN(condBitWidth)
+                                              : value.isIntN(condBitWidth);
+    if (signedValueForUnsignedCond || !isRepresentable) {
+      return emitOpError("expects case value to be representable by ")
+             << (condIsSigned ? "si" : "ui") << condBitWidth << " but got "
+             << getAPSIntStr(value);
+    }
+    if (!valueSet.insert(value).second) {
+      return emitOpError("has duplicate case value: ") << getAPSIntStr(value);
+    }
+  }
+  auto verifyRegion = [&](Region &region, const Twine &name) -> LogicalResult {
+    auto yield = dyn_cast<YieldOp>(region.front().back());
+    if (!yield)
+      return emitOpError("expected region to end with scf.yield, but got ")
+             << region.front().back().getName();
+
+    if (yield.getNumOperands() != getNumResults()) {
+      return (emitOpError("expected each region to return ")
+              << getNumResults() << " values, but " << name << " returns "
+              << yield.getNumOperands())
+                 .attachNote(yield.getLoc())
+             << "see yield operation here";
+    }
+    for (auto [idx, result, operand] :
+         llvm::enumerate(getResultTypes(), yield.getOperands())) {
+      if (!operand)
+        return yield.emitOpError() << "operand " << idx << " is null\n";
+      if (result == operand.getType())
+        continue;
+      return (emitOpError("expected result #")
+              << idx << " of each region to be " << result)
+                 .attachNote(yield.getLoc())
+             << name << " returns " << operand.getType() << " here";
+    }
+    return success();
+  };
+
+  if (failed(verifyRegion(getDefaultRegion(), "default region")))
+    return failure();
+  for (auto [idx, caseRegion] : llvm::enumerate(getCaseRegions()))
+    if (failed(verifyRegion(caseRegion, "case region #" + Twine(idx))))
+      return failure();
+
+  return success();
+}
+
+unsigned SwitchOp::getNumCases() { return getCases().size(); }
+
+Block &SwitchOp::getDefaultBlock() { return getDefaultRegion().front(); }
+
+Block &SwitchOp::getCaseBlock(unsigned idx) {
+  assert(idx < getNumCases() && "case index out-of-bounds");
+  return getCaseRegions()[idx].front();
+}
+
+void SwitchOp::getSuccessorRegions(
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &successors) {
+  // All regions branch back to the parent op.
+  if (!point.isParent()) {
+    successors.emplace_back(getOperation(), getResults());
+    return;
+  }
+
+  llvm::append_range(successors, getRegions());
+}
+
+void SwitchOp::getEntrySuccessorRegions(
+    ArrayRef<Attribute> operands,
+    SmallVectorImpl<RegionSuccessor> &successors) {
+  FoldAdaptor adaptor(operands, *this);
+
+  // If a constant was not provided, all regions are possible successors.
+  auto arg = dyn_cast_or_null<IntegerAttr>(adaptor.getArg());
+  if (!arg) {
+    llvm::append_range(successors, getRegions());
+    return;
+  }
+
+  // Otherwise, try to find a case with a matching value. If not, the
+  // default region is the only successor.
+  for (auto [caseAttr, caseRegion] : llvm::zip(getCases(), getCaseRegions())) {
+    const IntegerAttr intAttr = cast<IntegerAttr>(caseAttr);
+    const APInt caseValue = intAttr.getValue();
+    if (caseValue == arg.getValue()) {
+      successors.emplace_back(&caseRegion);
+      return;
+    }
+  }
+  successors.emplace_back(&getDefaultRegion());
+}
+
+void SwitchOp::getRegionInvocationBounds(
+    ArrayRef<Attribute> operands, SmallVectorImpl<InvocationBounds> &bounds) {
+  auto operandValue = llvm::dyn_cast_or_null<IntegerAttr>(operands.front());
+  if (!operandValue) {
+    // All regions are invoked at most once.
+    bounds.append(getNumRegions(), InvocationBounds(/*lb=*/0, /*ub=*/1));
+    return;
+  }
+
+  unsigned liveIndex = getNumRegions() - 1;
+  const auto it = llvm::find_if(getCases(), [&operandValue](Attribute attr) {
+    const IntegerAttr intAttr = cast<IntegerAttr>(attr);
+    return intAttr.getValue() == operandValue.getValue();
+  });
+  if (it != getCases().end())
+    liveIndex = std::distance(getCases().begin(), it);
+  for (unsigned i = 0, e = getNumRegions(); i < e; ++i)
+    bounds.emplace_back(/*lb=*/0, /*ub=*/i == liveIndex);
+}
+
+struct FoldConstantCase : OpRewritePattern<SwitchOp> {
+  using OpRewritePattern<SwitchOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(SwitchOp op,
+                                PatternRewriter &rewriter) const override {
+    // If `op.getArg()` is a constant, select the region that matches with
+    // the constant value. Use the default region if no matche is found.
+    std::optional<std::pair<APInt, bool>> maybeCst =
+        getConstantAPIntValue(op.getArg());
+    if (!maybeCst.has_value())
+      return failure();
+    // index type not supported
+    if (maybeCst->second) {
+      return failure();
+    }
+    const APInt cst = maybeCst->first;
+    int64_t caseIdx, e = op.getNumCases();
+    // Original code:
+    for (caseIdx = 0; caseIdx < e; ++caseIdx) {
+      const Attribute &attr = op.getCases()[caseIdx];
+      const IntegerAttr &intAttr = cast<IntegerAttr>(attr);
+      // TODO: need to check at runtime if this runs before validate
+      assert(intAttr);
+      const APSInt attrVal = intAttr.getAPSInt().extOrTrunc(cst.getBitWidth());
+      if (cst == attrVal)
+        break;
+    }
+
+    Region &r = (caseIdx < op.getNumCases()) ? op.getCaseRegions()[caseIdx]
+                                             : op.getDefaultRegion();
+    Block &source = r.front();
+    Operation *terminator = source.getTerminator();
+    SmallVector<Value> results = terminator->getOperands();
+
+    rewriter.inlineBlockBefore(&source, op);
+    rewriter.eraseOp(terminator);
+    // Replace the operation with a potentially empty list of results.
+    // Fold mechanism doesn't support the case where the result list is empty.
+    rewriter.replaceOp(op, results);
+
+    return success();
+  }
+};
+
+void SwitchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.add<FoldConstantCase>(context);
 }
 
 } // namespace coredsl
