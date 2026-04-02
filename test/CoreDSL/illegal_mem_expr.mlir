@@ -197,8 +197,8 @@ coredsl.isax "" {
 
 coredsl.isax "" {
     coredsl.addrspace core_mem @MEM : (ui32) -> ui8
-    // expected-error @+1 {{'coredsl.get' op attribute 'from' failed to satisfy constraint: index attribute whose value is non-negative}}
-    %1 = coredsl.get @MEM[-1:0] : ui8
+    // expected-error @+1 {{Negative indices in an access range are only allowed when using a base index, as they will always be out of bounds without one}}
+    %1 = coredsl.get @MEM[-1:0] : ui16
 }
 
 // -----
