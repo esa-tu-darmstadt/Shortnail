@@ -646,7 +646,7 @@ _Declares a register (file)._
 Syntax:
 
 ```
-operation ::= `coredsl.register` $accessMode oilist(`const` $isConst | `volatile` $isVolatile) $sym_name (`[` $numElements^ `]`)? `` custom<Initializer>($initializer) `:` $regType attr-dict
+operation ::= `coredsl.register` $accessMode oilist(`const` $isConst | `volatile` $isVolatile) $sym_name (`[` $numElements^ `]`)? custom<Initializer>($initializer, $regType) attr-dict
 ```
 
 This operation declares a [CoreDSL register](https://github.com/Minres/CoreDSL/wiki/Structure-and-concepts#registers)
@@ -681,7 +681,7 @@ Interfaces: `GetSetOpInterface`, `Symbol`
 <tr><td><code>isConst</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 <tr><td><code>isVolatile</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 <tr><td><code>numElements</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
-<tr><td><code>initializer</code></td><td>::mlir::ArrayAttr</td><td>Index array attribute</td></tr>
+<tr><td><code>initializer</code></td><td>::mlir::ElementsAttr</td><td>constant vector/tensor attribute</td></tr>
 <tr><td><code>regType</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>accessMode</code></td><td>::mlir::coredsl::RegisterAccessModeAttr</td><td>coredsl.register access mode</td></tr>
 </table>

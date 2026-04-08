@@ -883,17 +883,14 @@ def init_cust_regs():
         os << "state[\"cust_regs\"][" << reg.getSymNameAttr() << "] = [0] * "
            << reg.getSize() << "\n";
         // Handle init values
-        if (ArrayAttr initializer = reg.getInitializerAttr()) {
-          bool regIsSigned = cast<IntegerType>(reg.getRegType()).isSigned();
-
+        if (auto initializer = dyn_cast_or_null<DenseIntElementsAttr>(
+                reg.getInitializerAttr())) {
+          bool isSigned = cast<IntegerType>(reg.getRegType()).isSigned();
           unsigned addr = 0;
-          for (auto iv : initializer.getAsValueRange<IntegerAttr>()) {
+          for (auto iv : initializer.getValues<APInt>()) {
             os << "state[\"cust_regs\"][" << reg.getSymNameAttr() << "]["
                << addr << "] = int(";
-            if (regIsSigned)
-              os << iv.getSExtValue();
-            else
-              os << iv.getZExtValue();
+            iv.print(os, isSigned);
             os << ")\n";
             ++addr;
           }
@@ -905,14 +902,11 @@ def init_cust_regs():
     for (auto rom : roms) {
       os << ROM_PREFIX << rom.getSymName() << " = [";
 
-      ArrayAttr initializer = rom.getInitializerAttr();
-      bool regIsSigned = cast<IntegerType>(rom.getRegType()).isSigned();
-      for (auto iv : initializer.getAsValueRange<IntegerAttr>()) {
+      bool isSigned = cast<IntegerType>(rom.getRegType()).isSigned();
+      auto initializer = cast<DenseIntElementsAttr>(rom.getInitializerAttr());
+      for (auto iv : initializer.getValues<APInt>()) {
         os << "int(";
-        if (regIsSigned)
-          os << iv.getSExtValue();
-        else
-          os << iv.getZExtValue();
+        iv.print(os, isSigned);
         os << "), ";
       }
       os << "]\n";
