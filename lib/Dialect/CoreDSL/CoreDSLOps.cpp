@@ -17,8 +17,6 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OpImplementation.h"
 
-#include "llvm/ADT/APSInt.h"
-
 using namespace circt::hwarith;
 
 namespace mlir {
@@ -443,23 +441,17 @@ LogicalResult RegisterOp::verify() {
   }
 
   // Initializer checks
-  if (ArrayAttr initializer = getInitializerAttr()) {
-    auto initValues = initializer.getAsValueRange<IntegerAttr>();
-    unsigned initSize = std::distance(initValues.begin(), initValues.end());
-    if (initSize != getSize())
+  if (ElementsAttr initializer = getInitializerAttr()) {
+    if (initializer.getNumElements() != static_cast<int64_t>(getSize()))
       return emitError(
           "number of elements in initializer does not match register size");
 
-    // check that the values do not exceed the type size
-    unsigned regTypeWidth = getRegType().getIntOrFloatBitWidth();
-    for (auto iv : initValues) {
-      unsigned ivWidth =
-          getAPIntBitWidth(iv, cast<IntegerType>(getRegType()).isSigned());
-      if (ivWidth > regTypeWidth) {
-        return emitError("initial value width exceeds register width: ")
-               << iv.getSExtValue() << " (" << ivWidth << " bits)";
-      }
-    }
+    if (!isa<DenseIntElementsAttr>(initializer))
+      return emitOpError("initializer must be a DenseIntElementsAttr");
+
+    auto init = cast<DenseIntElementsAttr>(initializer);
+    if (init.getElementType() != getRegType())
+      return emitError("initial value type must match the register type");
   } else {
     if (getIsConst())
       return emitError("Const registers must be initialized");
@@ -485,15 +477,20 @@ LogicalResult RegisterOp::verify() {
   return success();
 }
 
-static ParseResult parseInitializer(OpAsmParser &parser, ArrayAttr &attr) {
-  auto &builder = parser.getBuilder();
-  if (failed(parser.parseOptionalEqual()))
-    // No initializer!
-    return success();
+static ParseResult parseInitializer(OpAsmParser &parser, ElementsAttr &attr,
+                                    TypeAttr &regTypeAttr) {
+  Type regType;
+  if (failed(parser.parseOptionalEqual())) {
+    // No initializer, but we still need a type!
+    auto res = parser.parseColonType(regType);
+    regTypeAttr = TypeAttr::get(regType);
+    return res;
+  }
 
-  SmallVector<int64_t> values;
+  auto valuesLoc = parser.getCurrentLocation();
+  SmallVector<APInt> values;
   auto parseInt = [&]() -> ParseResult {
-    int64_t v;
+    APInt v;
     auto res = parser.parseOptionalInteger(v);
     if (!res.has_value() || failed(*res))
       return failure();
@@ -501,32 +498,63 @@ static ParseResult parseInitializer(OpAsmParser &parser, ArrayAttr &attr) {
     return success();
   };
 
-  if (succeeded(parseInt()) || succeeded(parser.parseCommaSeparatedList(
-                                   AsmParser::Delimiter::Square, parseInt))) {
-    attr = builder.getIndexArrayAttr(values);
+  if ((succeeded(parseInt()) || succeeded(parser.parseCommaSeparatedList(
+                                    AsmParser::Delimiter::Square, parseInt))) &&
+      succeeded(parser.parseColonType(regType))) {
+    unsigned targetWidth = regType.getIntOrFloatBitWidth();
+    bool isSigned = cast<IntegerType>(regType).isSigned();
+
+    // Validate ranges and resize APInts to match register type bitwidth
+    for (auto &v : values) {
+      unsigned reqWidth = getAPIntBitWidth(v, isSigned);
+      if (reqWidth > targetWidth) {
+        auto diag =
+            parser.emitError(valuesLoc, "initial value width exceeds register "
+                                        "width: ");
+        SmallString<32> valStr;
+        llvm::raw_svector_ostream valOs(valStr);
+        v.print(valOs, /*isSigned=*/true);
+        diag << valStr << " (" << reqWidth << " bits)";
+        return diag;
+      }
+      if (v.getBitWidth() < targetWidth)
+        v = isSigned ? v.sext(targetWidth) : v.zext(targetWidth);
+      else if (v.getBitWidth() > targetWidth)
+        v = v.trunc(targetWidth);
+    }
+
+    auto shapedType =
+        RankedTensorType::get({static_cast<int64_t>(values.size())}, regType);
+    attr = DenseIntElementsAttr::get(shapedType, values);
+    regTypeAttr = TypeAttr::get(regType);
     return success();
   }
 
   return failure();
 }
 
-static void printInitializer(OpAsmPrinter &p, Operation *op, ArrayAttr attr) {
-  if (!attr)
+static void printInitializer(OpAsmPrinter &p, Operation *op, ElementsAttr attr,
+                             TypeAttr regTypeAttr) {
+  if (!attr) {
+    p << " : " << regTypeAttr;
     return;
+  }
+
+  bool isSigned = !cast<IntegerType>(regTypeAttr.getValue()).isUnsigned();
+  auto printValue = [&](const APInt &v) { v.print(p.getStream(), isSigned); };
 
   p << " = ";
-  auto values = attr.getValue();
+  auto values = attr.getValues<APInt>();
 
   if (values.size() == 1) {
-    p << cast<IntegerAttr>(values.front()).getAPSInt().getSExtValue();
+    printValue(*values.begin());
+    p << " : " << regTypeAttr;
     return;
   }
 
   p << "[";
-  llvm::interleaveComma(values, p, [&](Attribute v) {
-    p << cast<IntegerAttr>(v).getAPSInt().getSExtValue();
-  });
-  p << "]";
+  llvm::interleaveComma(values, p, printValue);
+  p << "] : " << regTypeAttr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -787,11 +815,12 @@ LogicalResult GetOp::canonicalize(GetOp op, PatternRewriter &rewriter) {
   auto regOp = cast<RegisterOp>(resolvedSym);
   auto initOpt = regOp.getInitializer();
   assert(initOpt.has_value());
-  auto constVal = cast<IntegerAttr>(initOpt->getValue()[initIdx]);
+  assert(isa<DenseIntElementsAttr>(initOpt.value()));
+  auto constVal =
+      cast<DenseIntElementsAttr>(initOpt.value()).getValues<APInt>()[initIdx];
   auto resType = op->getResult(0).getType();
   rewriter.replaceOpWithNewOp<ConstantOp>(
-      op, resType,
-      rewriter.getIntegerAttr(resType, constVal.getValue().getSExtValue()));
+      op, resType, rewriter.getIntegerAttr(resType, constVal));
 
   return success();
 }

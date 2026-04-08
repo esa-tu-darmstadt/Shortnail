@@ -182,14 +182,11 @@ def RegisterAccessMode : I64EnumAttr<
     "coredsl.register access mode",
     [DefaultRegisterFile, PCRegister, FPRegister, LocalRegister]>;
 
-def IndexArrayAttr
-  : TypedArrayAttrBase<IndexAttr, "Index array attribute">;
-
 def CoreDSL_RegisterOp : 
     GetSettableOp<"register", /*prefixAssemblyFormat=*/"$accessMode",
-                  /*suffixAssemblyFormat=*/"(`[` $numElements^ `]`)? `` custom<Initializer>($initializer) `:` $regType attr-dict",
+                  /*suffixAssemblyFormat=*/"(`[` $numElements^ `]`)? custom<Initializer>($initializer, $regType) attr-dict",
                   /*moreArgs=*/(ins OptionalAttr<IndexAttr>:$numElements,
-                   OptionalAttr<IndexArrayAttr>:$initializer, TypeAttr:$regType,
+                   OptionalAttr<ElementsAttr>:$initializer, TypeAttr:$regType,
                    RegisterAccessMode:$accessMode)> {
   let summary = "Declares a register (file).";
   let description = [{

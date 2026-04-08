@@ -50,6 +50,19 @@ coredsl.isax "" {
 
 // -----
 
+// Test for arbitrary-width (>64 bit) register initialization values
+// CHECK:         coredsl.register local @BIG_UNSIGNED = 28446744073709551616 : ui65
+// CHECK:         coredsl.register local @BIG_SIGNED = -28446744073709551617 : si66
+// CHECK:         coredsl.register local const @BIG_ARRAY[2] = [18446744073709551616, 36893488147419103231] : ui65
+coredsl.isax "" {
+    coredsl.register core_pc @PC : ui32
+    coredsl.register local @BIG_UNSIGNED = 28446744073709551616 : ui65
+    coredsl.register local @BIG_SIGNED = -28446744073709551617 : si66
+    coredsl.register local const @BIG_ARRAY[2] = [18446744073709551616, 36893488147419103231] : ui65
+}
+
+// -----
+
 coredsl.isax "" {
   // expected-error @+1 {{Const registers must be initialized}}
   coredsl.register local const @C1 : ui32

@@ -84,6 +84,8 @@ coredsl.isax "" {
     coredsl.register core_x @ACC6 = 256 : ui8
 }
 
+// -----
+
 coredsl.isax "" {
     // Legal init value expressions:
     // expected-error @+1 {{initial value width exceeds register width}}
