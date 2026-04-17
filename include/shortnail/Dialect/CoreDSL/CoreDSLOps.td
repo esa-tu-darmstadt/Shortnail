@@ -520,7 +520,7 @@ class TIBinOp<string mnemonic, list<Trait> traits = []> :
                                           std::optional<Location> loc,
                                           ValueRange operands,
                                           DictionaryAttr attrs,
-                                          mlir::OpaqueProperties properties,
+                                          mlir::PropertyRef properties,
                                           mlir::RegionRange regions,
                                           SmallVectorImpl<Type> &results);
   }];
@@ -561,7 +561,7 @@ class BitOp<string mnemonic> : TIBinOp<mnemonic, [Commutative]> {
                                               std::optional<Location> loc,
                                               ValueRange operands,
                                               DictionaryAttr attrs,
-                                              mlir::OpaqueProperties properties,
+                                              mlir::PropertyRef properties,
                                               mlir::RegionRange regions,
                                               SmallVectorImpl<Type> &results) {
       return ::mlir::coredsl::inferBitOpTypes(context, loc, operands, attrs,
