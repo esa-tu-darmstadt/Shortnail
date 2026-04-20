@@ -29,7 +29,6 @@ def MergeIsax : Pass<"merge-multiple-isaxes", "mlir::ModuleOp"> {
 
     If only a single `coredsl.isax` is present, the pass is a no-op.
   }];
-  let constructor = "::mlir::shortnail::createMergeISAXPass()";
   let dependentDialects = [
     "::mlir::coredsl::CoreDSLDialect",
     "::mlir::func::FuncDialect"
@@ -54,7 +53,6 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
     simulation context object, enabling the generated Python to interface with
     the cocotb testbench infrastructure.
   }];
-  let constructor = "::mlir::shortnail::createCoreDSLToPyPass()";
   let dependentDialects = [
     "::mlir::coredsl::CoreDSLDialect",
     "::circt::hw::HWDialect",
@@ -70,7 +68,6 @@ def AnalyzeISAX : Pass<"analyze-isax", "mlir::ModuleOp"> {
     side effects. Expects exactly one coredsl.ISAXOp in the module.
     The YAML is consumed by the Python patch generator (gen_patches.py).
   }];
-  let constructor = "::mlir::shortnail::createAnalyzeISAXPass()";
   let dependentDialects = [
     "::mlir::coredsl::CoreDSLDialect",
     "::circt::hwarith::HWArithDialect",

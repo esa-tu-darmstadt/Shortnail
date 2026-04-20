@@ -32,10 +32,10 @@ int main(int argc, char **argv) {
                   scf::SCFDialect>();
 
   mlir::func::registerInlinerExtension(registry);
-  mlir::registerCSE();
-  mlir::registerSCCP();
-  mlir::registerInliner();
-  mlir::registerCanonicalizer();
+  mlir::registerCSEPass();
+  mlir::registerSCCPPass();
+  mlir::registerInlinerPass();
+  mlir::registerCanonicalizerPass();
 
   mlir::shortnail::registerConversionPasses();
 

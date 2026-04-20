@@ -6,11 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../PassDetail.h"
-
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HWArith/HWArithOps.h"
-#include "shortnail/Conversion/CoreDSLToPy.h"
+#include "shortnail/Conversion/Passes.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
@@ -21,6 +19,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Visitors.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/IndentedOstream.h"
@@ -33,6 +32,13 @@
 #include "llvm/Support/ToolOutputFile.h"
 
 #include <algorithm>
+
+namespace mlir {
+namespace shortnail {
+#define GEN_PASS_DEF_COREDSLTOPY
+#include "shortnail/Conversion/Passes.h.inc"
+} // namespace shortnail
+} // namespace mlir
 
 using namespace mlir;
 using namespace mlir::shortnail;
@@ -816,7 +822,9 @@ static bool emitAlways(mlir::raw_indented_ostream &os,
 }
 
 namespace {
-struct CoreDSLToPy : public CoreDSLToPyBase<CoreDSLToPy> {
+struct CoreDSLToPy
+    : public mlir::shortnail::impl::CoreDSLToPyBase<CoreDSLToPy> {
+  using CoreDSLToPyBase::CoreDSLToPyBase;
   void runOnOperation() override {
     auto isaxOp = getOperation();
 
@@ -988,7 +996,3 @@ if 'instruction' in locals() or 'instruction' in globals():
   }
 };
 } // anonymous namespace
-
-std::unique_ptr<Pass> mlir::shortnail::createCoreDSLToPyPass() {
-  return std::make_unique<CoreDSLToPy>();
-}
