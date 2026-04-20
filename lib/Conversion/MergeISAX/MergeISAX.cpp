@@ -6,14 +6,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../PassDetail.h"
-
-#include "shortnail/Conversion/MergeISAX.h"
+#include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
 #include "circt/Support/LLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Pass/Pass.h"
 #include "llvm/ADT/TypeSwitch.h"
+
+namespace mlir {
+namespace shortnail {
+#define GEN_PASS_DEF_MERGEISAX
+#include "shortnail/Conversion/Passes.h.inc"
+} // namespace shortnail
+} // namespace mlir
 
 // prefix to prepend to state elements
 // for non-shared elements, an index will be appended to the prefix to avoid
@@ -24,12 +30,6 @@ using namespace mlir;
 using namespace mlir::shortnail;
 using namespace mlir::coredsl;
 using namespace circt;
-
-namespace {
-struct MergeISAX : public MergeIsaxBase<MergeISAX> {
-  void runOnOperation() override;
-};
-} // namespace
 
 // checks if all operations in a list are of similar type
 template <typename T>
@@ -68,7 +68,8 @@ static void remapSymbolUses(Operation *oldOp, StringRef newSymbol) {
 template <typename T>
 static void
 cloneAndRemapOperations(SmallDenseMap<coredsl::ISAXOp, SmallVector<T>> &opMap,
-                        SmallVectorImpl<coredsl::ISAXOp> &isaxes, OpBuilder &b) {
+                        SmallVectorImpl<coredsl::ISAXOp> &isaxes,
+                        OpBuilder &b) {
   // count ISAXes for prefix generation
   for (auto [isaxCtr, isax] : enumerate(isaxes)) {
     auto prefix = Twine(PREFIX) + Twine(isaxCtr);
@@ -103,145 +104,146 @@ static void cloneAndRemapOperations(SmallDenseMap<coredsl::ISAXOp, T> &regMap,
   }
 }
 
-void MergeISAX::runOnOperation() {
+namespace {
+struct MergeISAX : public mlir::shortnail::impl::MergeIsaxBase<MergeISAX> {
+  using MergeIsaxBase::MergeIsaxBase;
+  void runOnOperation() override {
 
-  ModuleOp module = getOperation();
+    ModuleOp module = getOperation();
 
-  // collect all registers per ISAX
-  SmallDenseMap<coredsl::ISAXOp, RegisterOp> archRegsPerISAX, pcPerIsax,
-      fpRegsPerISAX;
-  SmallDenseMap<coredsl::ISAXOp, SmallVector<RegisterOp>> customRegsPerIsax;
+    // collect all registers per ISAX
+    SmallDenseMap<coredsl::ISAXOp, RegisterOp> archRegsPerISAX, pcPerIsax,
+        fpRegsPerISAX;
+    SmallDenseMap<coredsl::ISAXOp, SmallVector<RegisterOp>> customRegsPerIsax;
 
-  // collect aliasses per ISAX
-  SmallDenseMap<coredsl::ISAXOp, SmallVector<AliasOp>> aliasPerIsax;
+    // collect aliasses per ISAX
+    SmallDenseMap<coredsl::ISAXOp, SmallVector<AliasOp>> aliasPerIsax;
 
-  // collect all functions per ISAX
-  SmallDenseMap<coredsl::ISAXOp, SmallVector<func::FuncOp>> funcsPerISAX;
+    // collect all functions per ISAX
+    SmallDenseMap<coredsl::ISAXOp, SmallVector<func::FuncOp>> funcsPerISAX;
 
-  // collect all addr spaces per ISAX
-  SmallDenseMap<coredsl::ISAXOp, AddressSpaceOp> dmemPerISAX;
+    // collect all addr spaces per ISAX
+    SmallDenseMap<coredsl::ISAXOp, AddressSpaceOp> dmemPerISAX;
 
-  // build an index of modules
-  SmallVector<coredsl::ISAXOp> isaxes;
+    // build an index of modules
+    SmallVector<coredsl::ISAXOp> isaxes;
 
-  //
-  // collect state elements
-  //
+    //
+    // collect state elements
+    //
 
-  // iterate over ISAXes
-  for (auto op : module.getOps<coredsl::ISAXOp>()) {
-    isaxes.push_back(op);
+    // iterate over ISAXes
+    for (auto op : module.getOps<coredsl::ISAXOp>()) {
+      isaxes.push_back(op);
 
-    // create vector for custom regs and aliases since an ISAX may contain >1
-    auto &customRegsCurrentISAX = customRegsPerIsax[op];
-    auto &aliasCurrentISAX = aliasPerIsax[op];
-    auto &funcsCurrentISAX = funcsPerISAX[op];
+      // create vector for custom regs and aliases since an ISAX may contain >1
+      auto &customRegsCurrentISAX = customRegsPerIsax[op];
+      auto &aliasCurrentISAX = aliasPerIsax[op];
+      auto &funcsCurrentISAX = funcsPerISAX[op];
 
-    for (auto &wop : op.getOps()) {
-      bool success =
-          TypeSwitch<Operation *, bool>(&wop)
-              .Case<RegisterOp>([&](RegisterOp rop) {
-                switch (rop.getAccessMode()) {
-                // arch reg file
-                case RegisterAccessMode::core_x:
-                  assert(!archRegsPerISAX.contains(op));
-                  archRegsPerISAX[op] = rop;
-                  break;
-                // PC register
-                case RegisterAccessMode::core_pc:
-                  assert(!pcPerIsax.contains(op));
-                  pcPerIsax[op] = rop;
-                  break;
-                // fp reg file
-                case RegisterAccessMode::core_fp:
-                  assert(!fpRegsPerISAX.contains(op));
-                  fpRegsPerISAX[op] = rop;
-                  break;
-                // custom registers
-                case RegisterAccessMode::local:
-                  customRegsCurrentISAX.push_back(rop);
-                  break;
-                }
-                return true;
-              })
-              .Case<AliasOp>([&](AliasOp aop) {
-                // aliases
-                aliasCurrentISAX.push_back(aop);
-                return true;
-              })
-              .Case<func::FuncOp>([&](auto fun) {
-                // aliases
-                funcsCurrentISAX.push_back(fun);
-                return true;
-              })
-              .Case<AddressSpaceOp>([&](AddressSpaceOp aop) {
-                switch (aop.getAccessMode()) {
-                // data memory
-                case AddressSpaceAccessMode::core_mem:
-                  assert(!dmemPerISAX.contains(op));
-                  dmemPerISAX[op] = aop;
-                  break;
-                // error
-                default:
-                  op->emitError(
-                      "Merging of address spaces other than data memory is "
-                      "currently unsupported");
-                  return false;
-                }
-                return true;
-              })
-              .Default([](Operation *op) { return true; });
-      if (!success)
-        return signalPassFailure();
+      for (auto &wop : op.getOps()) {
+        bool success =
+            TypeSwitch<Operation *, bool>(&wop)
+                .Case<RegisterOp>([&](RegisterOp rop) {
+                  switch (rop.getAccessMode()) {
+                  // arch reg file
+                  case RegisterAccessMode::core_x:
+                    assert(!archRegsPerISAX.contains(op));
+                    archRegsPerISAX[op] = rop;
+                    break;
+                  // PC register
+                  case RegisterAccessMode::core_pc:
+                    assert(!pcPerIsax.contains(op));
+                    pcPerIsax[op] = rop;
+                    break;
+                  // fp reg file
+                  case RegisterAccessMode::core_fp:
+                    assert(!fpRegsPerISAX.contains(op));
+                    fpRegsPerISAX[op] = rop;
+                    break;
+                  // custom registers
+                  case RegisterAccessMode::local:
+                    customRegsCurrentISAX.push_back(rop);
+                    break;
+                  }
+                  return true;
+                })
+                .Case<AliasOp>([&](AliasOp aop) {
+                  // aliases
+                  aliasCurrentISAX.push_back(aop);
+                  return true;
+                })
+                .Case<func::FuncOp>([&](auto fun) {
+                  // aliases
+                  funcsCurrentISAX.push_back(fun);
+                  return true;
+                })
+                .Case<AddressSpaceOp>([&](AddressSpaceOp aop) {
+                  switch (aop.getAccessMode()) {
+                  // data memory
+                  case AddressSpaceAccessMode::core_mem:
+                    assert(!dmemPerISAX.contains(op));
+                    dmemPerISAX[op] = aop;
+                    break;
+                  // error
+                  default:
+                    op->emitError(
+                        "Merging of address spaces other than data memory is "
+                        "currently unsupported");
+                    return false;
+                  }
+                  return true;
+                })
+                .Default([](Operation *op) { return true; });
+        if (!success)
+          return signalPassFailure();
+      }
+    }
+
+    if (isaxes.size() == 1)
+      return; // Nothing to merge we only have a single ISAX
+
+    // make sure all architrectural state elements are of equal type
+    checkTypeEquality(archRegsPerISAX);
+    checkTypeEquality(pcPerIsax);
+    checkTypeEquality(fpRegsPerISAX);
+    checkTypeEquality(dmemPerISAX);
+
+    //
+    // Use collected information to move state elements and instructions
+    //
+
+    OpBuilder b{&getContext()};
+    b.setInsertionPointToEnd(module.getBody());
+    // rename top-level module to enable unified testing
+    auto topIsax =
+        coredsl::ISAXOp::create(b, module->getLoc(), b.getStringAttr("merged"));
+    // Create a new empty block
+    b.createBlock(&topIsax.getBody());
+    b.setInsertionPointToEnd(&topIsax.getBody().front());
+
+    // map state elements
+    for (auto regMap : {archRegsPerISAX, fpRegsPerISAX, pcPerIsax}) {
+      cloneAndRemapOperations(regMap, b);
+    }
+    cloneAndRemapOperations(dmemPerISAX, b);
+    cloneAndRemapOperations(customRegsPerIsax, isaxes, b);
+    cloneAndRemapOperations(aliasPerIsax, isaxes, b);
+    cloneAndRemapOperations(funcsPerISAX, isaxes, b);
+
+    // copy all blocks except registers, memory spaces and aliasses
+    for (auto isax : isaxes) {
+      for (auto &op : isax.getOps()) {
+
+        // Ignore already cloned and remapped operations
+        if (isa<RegisterOp, AliasOp, AddressSpaceOp, func::FuncOp>(op))
+          continue;
+
+        b.clone(op);
+      }
+      // remove old version of isax
+      isax->erase();
     }
   }
-
-  if (isaxes.size() == 1)
-    return; // Nothing to merge we only have a single ISAX
-
-  // make sure all architrectural state elements are of equal type
-  checkTypeEquality(archRegsPerISAX);
-  checkTypeEquality(pcPerIsax);
-  checkTypeEquality(fpRegsPerISAX);
-  checkTypeEquality(dmemPerISAX);
-
-  //
-  // Use collected information to move state elements and instructions
-  //
-
-  OpBuilder b{&getContext()};
-  b.setInsertionPointToEnd(module.getBody());
-  // rename top-level module to enable unified testing
-  auto topIsax =
-      coredsl::ISAXOp::create(b, module->getLoc(), b.getStringAttr("merged"));
-  // Create a new empty block
-  b.createBlock(&topIsax.getBody());
-  b.setInsertionPointToEnd(&topIsax.getBody().front());
-
-  // map state elements
-  for (auto regMap : {archRegsPerISAX, fpRegsPerISAX, pcPerIsax}) {
-    cloneAndRemapOperations(regMap, b);
-  }
-  cloneAndRemapOperations(dmemPerISAX, b);
-  cloneAndRemapOperations(customRegsPerIsax, isaxes, b);
-  cloneAndRemapOperations(aliasPerIsax, isaxes, b);
-  cloneAndRemapOperations(funcsPerISAX, isaxes, b);
-
-  // copy all blocks except registers, memory spaces and aliasses
-  for (auto isax : isaxes) {
-    for (auto &op : isax.getOps()) {
-
-      // Ignore already cloned and remapped operations
-      if (isa<RegisterOp, AliasOp, AddressSpaceOp, func::FuncOp>(op))
-        continue;
-
-      b.clone(op);
-    }
-    // remove old version of isax
-    isax->erase();
-  }
-}
-
-std::unique_ptr<Pass> shortnail::createMergeISAXPass() {
-  return std::make_unique<MergeISAX>();
-}
+};
+} // namespace

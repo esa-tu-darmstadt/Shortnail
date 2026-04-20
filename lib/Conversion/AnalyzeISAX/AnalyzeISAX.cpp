@@ -6,20 +6,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../PassDetail.h"
-
+#include "shortnail/Conversion/Passes.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
 #include "circt/Dialect/HWArith/HWArithDialect.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FormatVariadic.h"
+
+namespace mlir {
+namespace shortnail {
+#define GEN_PASS_DEF_ANALYZEISAX
+#include "shortnail/Conversion/Passes.h.inc"
+} // namespace shortnail
+} // namespace mlir
 
 using namespace mlir;
 
@@ -706,7 +714,9 @@ static void writeYAML(const ISAXInfo &isax, mlir::raw_indented_ostream &os) {
 // Pass definition
 //===----------------------------------------------------------------------===//
 
-struct AnalyzeISAXPass : public shortnail::AnalyzeISAXBase<AnalyzeISAXPass> {
+struct AnalyzeISAXPass
+    : public mlir::shortnail::impl::AnalyzeISAXBase<AnalyzeISAXPass> {
+  using AnalyzeISAXBase::AnalyzeISAXBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -768,15 +778,3 @@ struct AnalyzeISAXPass : public shortnail::AnalyzeISAXBase<AnalyzeISAXPass> {
 };
 
 } // namespace
-
-//===----------------------------------------------------------------------===//
-// Pass creation
-//===----------------------------------------------------------------------===//
-
-namespace mlir {
-namespace shortnail {
-std::unique_ptr<Pass> createAnalyzeISAXPass() {
-  return std::make_unique<AnalyzeISAXPass>();
-}
-} // namespace shortnail
-} // namespace mlir

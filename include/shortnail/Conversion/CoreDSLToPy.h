@@ -9,17 +9,13 @@
 #ifndef SHORTNAIL_CONVERSION_COREDSLTOPY_H
 #define SHORTNAIL_CONVERSION_COREDSLTOPY_H
 
-#include <memory>
-
 namespace mlir {
 
-class Pass;
 class Operation;
 
 namespace shortnail {
 
 void deleteUnusedSymbols(Operation *startOp);
-std::unique_ptr<mlir::Pass> createCoreDSLToPyPass();
 
 } // namespace shortnail
 } // namespace mlir

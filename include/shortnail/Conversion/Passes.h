@@ -9,15 +9,16 @@
 #ifndef SHORTNAIL_CONVERSION_PASSES_H
 #define SHORTNAIL_CONVERSION_PASSES_H
 
-#include "shortnail/Conversion/AnalyzeISAX.h"
 #include "shortnail/Conversion/CoreDSLToPy.h"
-#include "shortnail/Conversion/MergeISAX.h"
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
 namespace mlir {
 namespace shortnail {
+
+#define GEN_PASS_DECL
+#include "shortnail/Conversion/Passes.h.inc"
 
 #define GEN_PASS_REGISTRATION
 #include "shortnail/Conversion/Passes.h.inc"
