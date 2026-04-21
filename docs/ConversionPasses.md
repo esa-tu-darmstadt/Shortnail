@@ -15,6 +15,14 @@ The YAML is consumed by the Python patch generator (gen_patches.py).
 -output : Output path for the YAML analysis file
 ```
 
+### `-coredsl-lift-cf-to-scf`
+
+_Lift cf operations to scf operations_
+
+Converts all cf operations to scf operations using the ControlFlowToSCF
+Pass. This is a separate pass, as just running the ControlFlowToSCF pass
+does not work, as it does not know how to decend to the child operations
+
 ### `-coredsl-to-python`
 
 _Transpile CoreDSL to Python._

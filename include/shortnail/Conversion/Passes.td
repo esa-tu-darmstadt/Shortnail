@@ -60,6 +60,19 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
   ];
 }
 
+def CoreDSLLiftCFToSCF : Pass<"coredsl-lift-cf-to-scf", "::mlir::coredsl::ISAXOp"> {
+  let summary = "Lift cf operations to scf operations";
+  let description = [{
+    Converts all cf operations to scf operations using the ControlFlowToSCF
+    Pass. This is a separate pass, as just running the ControlFlowToSCF pass
+    does not work, as it does not know how to decend to the child operations
+  }];
+
+  let dependentDialects = [
+    "::mlir::coredsl::CoreDSLDialect",
+  ];
+}
+
 def AnalyzeISAX : Pass<"analyze-isax", "mlir::ModuleOp"> {
   let summary = "Analyze CoreDSL ISAX MLIR and output structured YAML";
   let description = [{

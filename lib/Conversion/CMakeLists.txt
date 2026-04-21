@@ -1,3 +1,4 @@
 add_subdirectory(AnalyzeISAX)
 add_subdirectory(CoreDSLToPy)
 add_subdirectory(MergeISAX)
+add_subdirectory(CoreDSLLiftCFToSCF)
