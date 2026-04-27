@@ -1,4 +1,5 @@
 #include "mlir/Transforms/DialectConversion.h"
+#include "shortnail/Conversion/Passes.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
 #include "circt/Dialect/HWArith/HWArithDialect.h"
@@ -30,12 +31,12 @@ struct IndexSwitchToSCFIf : public OpConversionPattern<scf::IndexSwitchOp> {
     // switch
     const Location loc = op.getLoc();
     int64_t caseVal = op.getCases()[caseIdx];
-    auto argType = op.getArg().getType();
-    auto rightTypeCaseVal = IntegerAttr::get(op.getArg().getType(), caseVal);
-    hwarith::ConstantOp constant =
-        hwarith::ConstantOp::create(rewriter, loc, argType, rightTypeCaseVal);
-    hwarith::ICmpOp compareOp = hwarith::ICmpOp::create(
-        rewriter, loc, hwarith::ICmpPredicate::eq, op.getArg(), constant);
+    // Use arith for comparison, because hwarith::ICmp does not work with index
+    // types
+    arith::ConstantIndexOp constant =
+        arith::ConstantIndexOp::create(rewriter, loc, caseVal);
+    arith::CmpIOp compareOp = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq, constant, op.getArg());
     scf::IfOp resultOp =
         scf::IfOp::create(rewriter, loc, op.getResultTypes(), compareOp, true);
     Block *thenBlock = &resultOp.getThenRegion().front();
@@ -65,28 +66,29 @@ struct IndexSwitchToSCFIf : public OpConversionPattern<scf::IndexSwitchOp> {
 };
 } // anonymous namespace
 
-
 namespace {
-struct CoreDSLSwitchToIf : public mlir::shortnail::impl::CoreDSLSwitchToIfBase<CoreDSLSwitchToIf> {
-    using CoreDSLSwitchToIfBase::CoreDSLSwitchToIfBase;
+struct CoreDSLSwitchToIf
+    : public mlir::shortnail::impl::CoreDSLSwitchToIfBase<CoreDSLSwitchToIf> {
+  using CoreDSLSwitchToIfBase::CoreDSLSwitchToIfBase;
 
-    void runOnOperation() override {
-        auto isaxOp = getOperation();
-        MLIRContext& ctx = getContext();
-        // First convert the cf operations
-        OpPassManager cfToSCFPM{isaxOp.getOperationName()};
-        cfToSCFPM.addPass(createCoreDSLSwitchToIf());
-        if (failed(runPipeline(cfToSCFPM, isaxOp))) {
-            return signalPassFailure();
-        }
-        RewritePatternSet patterns{&ctx};
-        ConversionTarget target{ctx};
-        target.addIllegalOp<scf::IndexSwitchOp>();
-        patterns.insert<IndexSwitchToSCFIf>(&ctx);
-        // TODO: is this a full conversion?
-        if (failed(applyFullConversion(isaxOp, target, std::move(patterns)))) {
-            return signalPassFailure();
-        }
+  void runOnOperation() override {
+    auto isaxOp = getOperation();
+    MLIRContext &ctx = getContext();
+    // First convert the cf operations
+    OpPassManager cfToSCFPM{isaxOp.getOperationName()};
+    cfToSCFPM.addPass(createCoreDSLLiftCFToSCF());
+    if (failed(runPipeline(cfToSCFPM, isaxOp))) {
+      return signalPassFailure();
     }
+    RewritePatternSet patterns{&ctx};
+    ConversionTarget target{ctx};
+    target.addLegalDialect<coredsl::CoreDSLDialect, arith::ArithDialect,
+                           hwarith::HWArithDialect, scf::SCFDialect>();
+    target.addIllegalOp<scf::IndexSwitchOp>();
+    patterns.insert<IndexSwitchToSCFIf>(&ctx);
+    if (failed(applyFullConversion(isaxOp, target, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 };
 } // anonymous namespace
