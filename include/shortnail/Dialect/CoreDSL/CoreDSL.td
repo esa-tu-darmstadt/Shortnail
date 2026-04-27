@@ -86,6 +86,14 @@ def CoreDSL_Dialect : Dialect {
       }
       ```
     }];
+    let dependentDialects = [
+      "cf::ControlFlowDialect",
+      "scf::SCFDialect",
+      "hw::HWDialect",
+      "arith::ArithDialect",
+      "hwarith::HWArithDialect",
+      "func::FuncDialect",
+    ];
     let cppNamespace = "::mlir::coredsl";
 }
 
