@@ -73,6 +73,20 @@ def CoreDSLLiftCFToSCF : Pass<"coredsl-lift-cf-to-scf", "::mlir::coredsl::ISAXOp
   ];
 }
 
+def CoreDSLSwitchToIf : Pass<"coredsl-switch-to-if", "::mlir::coredsl::ISAXOp"> {
+  let summary = "Convert cf.switch operations to scf.if";
+  let description = [{
+    Converts all cf.switch operations to scf.if operations. To achieve this,
+    the cf.switch statements are first converted to scf using the
+    CoreDSLLiftCFToSCF pass. The scf.index_switch operations resulting from
+    this are then converted to a chain of scf.if
+  }];
+
+  let dependentDialects = [
+    "::mlir::coredsl::CoreDSLDialect",
+  ];
+}
+
 def AnalyzeISAX : Pass<"analyze-isax", "mlir::ModuleOp"> {
   let summary = "Analyze CoreDSL ISAX MLIR and output structured YAML";
   let description = [{
