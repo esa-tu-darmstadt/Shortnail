@@ -453,7 +453,10 @@ LogicalResult RegisterOp::verify() {
     if (init.getElementType() != getRegType())
       return emitError("initial value type must match the register type");
   } else {
-    if (getIsConst())
+    // Do not error for const volatile register spaces, as in this case the
+    // value may be changed arbitrarily by an external entity. Because of this,
+    // it is possible for the initially assigned value to never be read at all
+    if (getIsConst() && !getIsVolatile())
       return emitError("Const registers must be initialized");
   }
 
