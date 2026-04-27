@@ -13,9 +13,14 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/InliningUtils.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "circt/Dialect/HW/HWDialect.h"
+#include "circt/Dialect/HWArith/HWArithDialect.h"
 
 using namespace mlir;
 using namespace mlir::coredsl;
+using namespace circt;
 
 struct CoreDSLInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
