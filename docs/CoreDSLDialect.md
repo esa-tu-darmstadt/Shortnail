@@ -276,8 +276,8 @@ Effects: `MemoryEffects::Effect{}`
 
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
-<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
+<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
+<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
 #### Operands:
@@ -329,8 +329,8 @@ Effects: `MemoryEffects::Effect{}`
 
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
-<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
+<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
+<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
 #### Operands:
@@ -476,8 +476,8 @@ Examples:
 
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
-<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
+<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
+<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>sym</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 </table>
 
@@ -718,8 +718,8 @@ coredsl.set @MEM[%addr : ui32, 0:3] = %3 : ui32 // big-endian
 
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
-<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute whose value is non-negative</td></tr>
+<tr><td><code>from</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
+<tr><td><code>to</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>sym</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 </table>
 

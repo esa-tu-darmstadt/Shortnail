@@ -274,8 +274,8 @@ class CoreDSL_AccessOp<string mnemonic, string lhsAssemblyFormat, string rhsAsse
     : CoreDSL_Op<mnemonic, traits> {
 
   let arguments = !con((ins Optional<AllOfType<[HWArithIntegerType, AnyUnsignedInteger]>>:$base, 
-                        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$from,
-                        OptionalAttr<ConfinedAttr<IndexAttr, [IntNonNegative]>>:$to), additionalArgs);
+                        OptionalAttr<IndexAttr>:$from,
+                        OptionalAttr<IndexAttr>:$to), additionalArgs);
   let results = res;
 
   let assemblyFormat = lhsAssemblyFormat # "`` custom<RangedAccess>(\"" # isRangeAccessOptional # "\", $base, type($base), $from, $to) " # rhsAssemblyFormat;
@@ -291,24 +291,24 @@ class CoreDSL_AccessOp<string mnemonic, string lhsAssemblyFormat, string rhsAsse
       if (hasSingleIdxAccess()) {
         return 1;
       }
-      int64_t width = static_cast<int64_t>(getFrom()->getZExtValue()) -
-                      static_cast<int64_t>(getTo()->getZExtValue());
+      int64_t width = static_cast<int64_t>(getFrom()->getSExtValue()) -
+                      static_cast<int64_t>(getTo()->getSExtValue());
       return std::abs(width) + 1;
     }
 
     bool $cppClass::hasSingleIdxAccess() {
-      return !getTo() || !getFrom() || getFrom()->getZExtValue() == getTo()->getZExtValue();
+      return !getTo() || !getFrom() || getFrom()->getSExtValue() == getTo()->getSExtValue();
     }
 
     bool $cppClass::reversedAccessOrder() {
-      return getTo() && getFrom() && getFrom()->getZExtValue() < getTo()->getZExtValue();
+      return getTo() && getFrom() && getFrom()->getSExtValue() < getTo()->getSExtValue();
     }
 
     }] # folderPrototype # [{ {
       if (hasSingleIdxAccess() && getFrom()) {
         bool changed = false;
         // canonicalize single bit accesses such as val[%base, 0:0] to val[%base]
-        if (getBase() && getFrom()->getZExtValue() == 0) {
+        if (getBase() && getFrom()->getSExtValue() == 0) {
           removeFromAttr();
           changed = true;
         }

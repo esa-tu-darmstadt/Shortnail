@@ -589,11 +589,21 @@ static LogicalResult checkBitAccessOperation(BitOpTy op) {
   }
 
   if (auto from = op.getFrom()) {
+    if (!op.getBase() && from->isNegative()) {
+      return op.emitError(
+          "Negative indices in an access range are only allowed when using a "
+          "base index, as they will always be out of range without one");
+    }
     if (from->getZExtValue() >= valueWidth) {
       return op->emitError("bit index 'from' exceeds input value width");
     }
 
     if (auto to = op.getTo()) {
+      if (!op.getBase() && to->isNegative()) {
+        return op.emitError(
+            "Negative indices in an access range are only allowed when using a "
+            "base index, as they will always be out of range without one");
+      }
       if (to->getZExtValue() >= valueWidth) {
         return op->emitError("bit index 'to' exceeds input value width");
       }
@@ -718,16 +728,18 @@ static LogicalResult checkAccess(AccessOpTy op, Type requiredType) {
     // check that neither the offsets nor the access width violate the max index
     // width!
     if (auto from = op.getFrom()) {
-      auto reqBitWidth = getAPIntBitWidth(from.value(), false);
+      auto reqBitWidth = getAPIntBitWidth(from.value(), from->isNegative());
       if (reqBitWidth > info->maxIdxWidth)
         return op.emitError("`from` offset exceeds the register/address "
                             "space's address width of ")
                << info->maxIdxWidth << " with a required offset bit width of "
                << reqBitWidth;
 
-      uint64_t startOffset = from.value().getZExtValue();
+      // Using sign extension is safe here, as the MSB will only be set as a
+      // sign bit by MLIR
+      int64_t startOffset = from->getSExtValue();
       if (auto to = op.getTo()) {
-        auto reqBitWidth = getAPIntBitWidth(to.value(), false);
+        auto reqBitWidth = getAPIntBitWidth(to.value(), to->isNegative());
         if (reqBitWidth > info->maxIdxWidth)
           return op.emitError("`to` offset exceeds the register/address "
                               "space's address width of ")
@@ -738,12 +750,24 @@ static LogicalResult checkAccess(AccessOpTy op, Type requiredType) {
           return op.emitError("the access width exceeds the address width of "
                               "register/address space");
 
-        startOffset = std::min(to.value().getZExtValue(), startOffset);
+        startOffset = std::min(to->getSExtValue(), startOffset);
       }
-
-      if (info->size != 0 && startOffset + op.getAccessWidth() > info->size) {
-        return op.emitError("the access range exceeds the bounds of the "
-                            "register/address space");
+      // If there is a base offset, we cannot determine whether accesses are
+      // out of bounds without knowing the access value
+      if (!op.getBase()) {
+        // if there is only a range given, not a base index, negative values
+        // will always be out of bounds
+        if (startOffset < 0) {
+          return op.emitError(
+              "Negative indices in an access range are only allowed when using "
+              "a base index, as they will always be out of bounds without one");
+        }
+        const uint64_t startOffsetUnsigned = static_cast<uint64_t>(startOffset);
+        if (info->size != 0 &&
+            startOffsetUnsigned + op.getAccessWidth() > info->size) {
+          return op.emitError("the access range exceeds the bounds of the "
+                              "register/address space");
+        }
       }
     }
 
@@ -773,7 +797,7 @@ static Operation *genericResolveSymbol(Operation *op, StringRef sym) {
   return lookupSymbolInModule<GetSetOpInterface>(op, sym);
 }
 
-static RegisterOp fullyResolveReference(Operation *op, unsigned &startOffset) {
+static RegisterOp fullyResolveReference(Operation *op, int64_t &startOffset) {
   if (auto regOp = dyn_cast<RegisterOp>(op))
     return regOp;
   if (isa<AliasOp>(op)) {
@@ -787,7 +811,7 @@ static RegisterOp fullyResolveReference(Operation *op, unsigned &startOffset) {
 
 LogicalResult GetOp::canonicalize(GetOp op, PatternRewriter &rewriter) {
   // Perform constant propagation, replace by a constant if feasible!
-  unsigned initIdx = 0;
+  int64_t initIdx = 0;
   if (auto accessIdx = op.getBase()) {
     auto *defOp = accessIdx.getDefiningOp();
     if (!defOp || !defOp->hasTrait<OpTrait::ConstantLike>())
@@ -802,20 +826,20 @@ LogicalResult GetOp::canonicalize(GetOp op, PatternRewriter &rewriter) {
     return failure();
 
   if (auto from = op.getFrom())
-    initIdx += from->getZExtValue();
+    initIdx += from->getSExtValue();
 
   auto resolvedSym = op.resolveSymbol();
   resolvedSym = fullyResolveReference(resolvedSym, initIdx);
   if (!resolvedSym)
     return failure();
 
-  // Non const target -> exit!
+  // Non const target or volatile target -> exit!
   assert(isa<GetSetOpInterface>(resolvedSym));
   assert(isa<RegisterOp>(resolvedSym));
-  if (!cast<RegisterOp>(resolvedSym).getIsConst())
+  auto regOp = cast<RegisterOp>(resolvedSym);
+  if (!regOp.getIsConst() || regOp.getIsVolatile())
     return failure();
 
-  auto regOp = cast<RegisterOp>(resolvedSym);
   auto initOpt = regOp.getInitializer();
   assert(initOpt.has_value());
   assert(isa<DenseIntElementsAttr>(initOpt.value()));
