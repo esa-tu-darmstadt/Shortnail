@@ -2,6 +2,7 @@
 #include "shortnail/Conversion/Passes.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
+#include "circt/Dialect/HW/HWDialect.h"
 #include "circt/Dialect/HWArith/HWArithDialect.h"
 #include "circt/Dialect/HWArith/HWArithOps.h"
 #include "mlir/Transforms/Passes.h"
@@ -83,7 +84,8 @@ struct CoreDSLSwitchToIf
     RewritePatternSet patterns{&ctx};
     ConversionTarget target{ctx};
     target.addLegalDialect<coredsl::CoreDSLDialect, arith::ArithDialect,
-                           hwarith::HWArithDialect, scf::SCFDialect>();
+                           hw::HWDialect, hwarith::HWArithDialect,
+                           scf::SCFDialect>();
     target.addIllegalOp<scf::IndexSwitchOp>();
     patterns.insert<IndexSwitchToSCFIf>(&ctx);
     if (failed(applyFullConversion(isaxOp, target, std::move(patterns)))) {
