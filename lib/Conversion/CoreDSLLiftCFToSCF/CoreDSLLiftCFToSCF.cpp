@@ -1,6 +1,4 @@
 #include "shortnail/Conversion/Passes.h"
-
-#include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
 #include "mlir/Conversion/ControlFlowToSCF/ControlFlowToSCF.h"
@@ -23,6 +21,8 @@ struct CoreDSLLiftCFToSCF
 
   void runOnOperation() override {
     auto isaxOp = getOperation();
+    // We can't use the LiftControlFlowToSCF pass, because it only visits func
+    // operations
     auto res =
         isaxOp->walk<WalkOrder::PreOrder>([&](coredsl::InstructionOp instr) {
           ControlFlowToSCFTransformation transformation;
@@ -57,7 +57,6 @@ struct CoreDSLLiftCFToSCF
       }
       return WalkResult::skip();
     });
-    // TODO: are there some changes we need to notify other passes of
   }
 };
 
