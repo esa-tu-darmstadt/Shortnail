@@ -589,16 +589,20 @@ static LogicalResult checkBitAccessOperation(BitOpTy op) {
   }
 
   if (auto from = op.getFrom()) {
-    if (from->isNegative()) {
-      return op->emitError("bit index 'from' must not be negative");
+    if (!op.getBase() && from->isNegative()) {
+      return op.emitError(
+          "Negative indices in an access range are only allowed when using a "
+          "base index, as they will always be out of range without one");
     }
     if (from->getZExtValue() >= valueWidth) {
       return op->emitError("bit index 'from' exceeds input value width");
     }
 
     if (auto to = op.getTo()) {
-      if (to->isNegative()) {
-        return op->emitError("bit index 'to' must not be negative");
+      if (!op.getBase() && to->isNegative()) {
+        return op.emitError(
+            "Negative indices in an access range are only allowed when using a "
+            "base index, as they will always be out of range without one");
       }
       if (to->getZExtValue() >= valueWidth) {
         return op->emitError("bit index 'to' exceeds input value width");
