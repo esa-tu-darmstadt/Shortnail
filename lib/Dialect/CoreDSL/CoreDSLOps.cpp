@@ -833,13 +833,13 @@ LogicalResult GetOp::canonicalize(GetOp op, PatternRewriter &rewriter) {
   if (!resolvedSym)
     return failure();
 
-  // Non const target -> exit!
+  // Non const target or volatile target -> exit!
   assert(isa<GetSetOpInterface>(resolvedSym));
   assert(isa<RegisterOp>(resolvedSym));
-  if (!cast<RegisterOp>(resolvedSym).getIsConst())
+  auto regOp = cast<RegisterOp>(resolvedSym);
+  if (!regOp.getIsConst() || regOp.getIsVolatile())
     return failure();
 
-  auto regOp = cast<RegisterOp>(resolvedSym);
   auto initOpt = regOp.getInitializer();
   assert(initOpt.has_value());
   assert(isa<DenseIntElementsAttr>(initOpt.value()));
