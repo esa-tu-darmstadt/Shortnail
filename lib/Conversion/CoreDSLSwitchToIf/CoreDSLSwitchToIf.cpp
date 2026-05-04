@@ -5,6 +5,7 @@
 #include "circt/Dialect/HW/HWDialect.h"
 #include "circt/Dialect/HWArith/HWArithDialect.h"
 #include "circt/Dialect/HWArith/HWArithOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -95,7 +96,7 @@ struct CoreDSLSwitchToIf
     ConversionTarget target{ctx};
     target.addLegalDialect<coredsl::CoreDSLDialect, arith::ArithDialect,
                            hw::HWDialect, hwarith::HWArithDialect,
-                           scf::SCFDialect>();
+                           scf::SCFDialect, func::FuncDialect>();
     target.addIllegalOp<scf::IndexSwitchOp>();
     patterns.insert<IndexSwitchToSCFIf>(&ctx);
     if (failed(applyFullConversion(isaxOp, target, std::move(patterns)))) {
