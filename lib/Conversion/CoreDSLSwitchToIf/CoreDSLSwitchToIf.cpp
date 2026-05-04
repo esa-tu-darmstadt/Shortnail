@@ -31,14 +31,24 @@ struct IndexSwitchToSCFIf : public OpConversionPattern<scf::IndexSwitchOp> {
     // NOTE: Each scf.if emitted will have the same location as the top level
     // switch
     const Location loc = op.getLoc();
-    int64_t caseVal = op.getCases()[caseIdx];
-    // Use arith for comparison, because hwarith::ICmp does not work with index
-    // types
-    arith::ConstantIndexOp constant =
-        arith::ConstantIndexOp::create(rewriter, loc, caseVal);
-    arith::CmpIOp compareOp = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq, constant, op.getArg());
-    scf::IfOp resultOp =
+    const int64_t caseVal = op.getCases()[caseIdx];
+    auto arg = op.getArg();
+    // TODO: non-ui index cast (not sure if that is generated here)
+    // We assume that no index ops other than the ones introduced by
+    // ControlFlowToSCF exist, which means that this operation must be an
+    // index_cast of the argument of the original cf.switch
+    assert(isa<arith::IndexCastUIOp>(arg.getDefiningOp()));
+    auto indexCast = dyn_cast<arith::IndexCastUIOp>(arg.getDefiningOp());
+    auto nonIndexArg = indexCast.getOperand();
+    auto cmpType = dyn_cast<IntegerType>(nonIndexArg.getType());
+    assert(cmpType);
+    auto caseAttr = IntegerAttr::get(cmpType, caseVal);
+    // Because cf.switch only supports signless integers as arguments, we can't
+    // use hwarith operations for the comparisons
+    auto constant = arith::ConstantOp::create(rewriter, loc, cmpType, caseAttr);
+    auto compareOp = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq, constant, nonIndexArg);
+    auto resultOp =
         scf::IfOp::create(rewriter, loc, op.getResultTypes(), compareOp, true);
     Block *thenBlock = &resultOp.getThenRegion().front();
     rewriter.inlineBlockBefore(&op.getCaseBlock(caseIdx), thenBlock,
@@ -89,6 +99,13 @@ struct CoreDSLSwitchToIf
     target.addIllegalOp<scf::IndexSwitchOp>();
     patterns.insert<IndexSwitchToSCFIf>(&ctx);
     if (failed(applyFullConversion(isaxOp, target, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+    // Run a dead value removal pass, as the index casts are now dead
+    // TODO: there has got to be an easier solution for this!!!!
+    OpPassManager finalPass{isaxOp.getOperationName()};
+    finalPass.addPass(createRemoveDeadValuesPass());
+    if (failed(runPipeline(finalPass, isaxOp))) {
       return signalPassFailure();
     }
   }
