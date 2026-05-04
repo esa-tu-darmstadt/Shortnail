@@ -10,12 +10,12 @@ coredsl.isax "SwitchStmt" {
 
 // CHECK: %0 = hwarith.constant 1 : ui1
 // CHECK: %1 = hwarith.constant 7 : ui3
-// CHECK: %c3 = arith.constant 3 : index
+// CHECK: %c3_i6 = arith.constant 3 : i6
 // CHECK: %2 = hwarith.constant 5 : ui3
-// CHECK: %c2 = arith.constant 2 : index
+// CHECK: %c2_i6 = arith.constant 2 : i6
 // CHECK: %3 = hwarith.constant 10 : ui4
-// CHECK: %c1 = arith.constant 1 : index
-// CHECK: %c0 = arith.constant 0 : index
+// CHECK: %c1_i6 = arith.constant 1 : i6
+// CHECK: %c0_i6 = arith.constant 0 : i6
 // CHECK: %4 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
 // CHECK: %5 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
 // CHECK: %6 = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
@@ -25,40 +25,39 @@ coredsl.isax "SwitchStmt" {
 // CHECK: %10 = coredsl.get @MEM[1:0] : ui16
 // CHECK: %11 = coredsl.get @MEM[2] : ui8
 // CHECK: %12 = hwarith.cast %4 : (ui5) -> i6
-// CHECK: %13 = arith.index_castui %12 : i6 to index
-// CHECK: %14 = arith.cmpi eq, %13, %c0 : index
-// CHECK: %15:3 = scf.if %14 -> (ui32, ui16, ui8) {
+// CHECK: %13 = arith.cmpi eq, %12, %c0_i6 : i6
+// CHECK: %14:3 = scf.if %13 -> (ui32, ui16, ui8) {
 // CHECK:   scf.yield %9, %10, %11 : ui32, ui16, ui8
 // CHECK: } else {
-// CHECK:   %16 = arith.cmpi eq, %13, %c1 : index
-// CHECK:   %17:3 = scf.if %16 -> (ui32, ui16, ui8) {
-// CHECK:     %18 = coredsl.cast %3 : ui4 to ui32
-// CHECK:     scf.yield %18, %10, %11 : ui32, ui16, ui8
+// CHECK:   %15 = arith.cmpi eq, %12, %c1_i6 : i6
+// CHECK:   %16:3 = scf.if %15 -> (ui32, ui16, ui8) {
+// CHECK:     %17 = coredsl.cast %3 : ui4 to ui32
+// CHECK:     scf.yield %17, %10, %11 : ui32, ui16, ui8
 // CHECK:   } else {
-// CHECK:     %18 = arith.cmpi eq, %13, %c2 : index
-// CHECK:     %19:3 = scf.if %18 -> (ui32, ui16, ui8) {
-// CHECK:       %20 = coredsl.cast %2 : ui3 to ui16
-// CHECK:       scf.yield %9, %20, %11 : ui32, ui16, ui8
+// CHECK:     %17 = arith.cmpi eq, %12, %c2_i6 : i6
+// CHECK:     %18:3 = scf.if %17 -> (ui32, ui16, ui8) {
+// CHECK:       %19 = coredsl.cast %2 : ui3 to ui16
+// CHECK:       scf.yield %9, %19, %11 : ui32, ui16, ui8
 // CHECK:     } else {
-// CHECK:       %20 = arith.cmpi eq, %13, %c3 : index
-// CHECK:       %21:3 = scf.if %20 -> (ui32, ui16, ui8) {
-// CHECK:         %22 = coredsl.cast %1 : ui3 to ui8
-// CHECK:         scf.yield %9, %10, %22 : ui32, ui16, ui8
+// CHECK:       %19 = arith.cmpi eq, %12, %c3_i6 : i6
+// CHECK:       %20:3 = scf.if %19 -> (ui32, ui16, ui8) {
+// CHECK:         %21 = coredsl.cast %1 : ui3 to ui8
+// CHECK:         scf.yield %9, %10, %21 : ui32, ui16, ui8
 // CHECK:       } else {
-// CHECK:         %22 = coredsl.cast %0 : ui1 to ui32
-// CHECK:         %23 = coredsl.cast %0 : ui1 to ui16
-// CHECK:         %24 = coredsl.cast %0 : ui1 to ui8
-// CHECK:         scf.yield %22, %23, %24 : ui32, ui16, ui8
+// CHECK:         %21 = coredsl.cast %0 : ui1 to ui32
+// CHECK:         %22 = coredsl.cast %0 : ui1 to ui16
+// CHECK:         %23 = coredsl.cast %0 : ui1 to ui8
+// CHECK:         scf.yield %21, %22, %23 : ui32, ui16, ui8
 // CHECK:       }
-// CHECK:       scf.yield %21#0, %21#1, %21#2 : ui32, ui16, ui8
+// CHECK:       scf.yield %20#0, %20#1, %20#2 : ui32, ui16, ui8
 // CHECK:     }
-// CHECK:     scf.yield %19#0, %19#1, %19#2 : ui32, ui16, ui8
+// CHECK:     scf.yield %18#0, %18#1, %18#2 : ui32, ui16, ui8
 // CHECK:   }
-// CHECK:   scf.yield %17#0, %17#1, %17#2 : ui32, ui16, ui8
+// CHECK:   scf.yield %16#0, %16#1, %16#2 : ui32, ui16, ui8
 // CHECK: }
-// CHECK: coredsl.set @X[%5 : ui5] = %15#0 : ui32
-// CHECK: coredsl.set @MEM[1:0] = %15#1 : ui16
-// CHECK: coredsl.set @MEM[2] = %15#2 : ui8
+// CHECK: coredsl.set @X[%5 : ui5] = %14#0 : ui32
+// CHECK: coredsl.set @MEM[1:0] = %14#1 : ui16
+// CHECK: coredsl.set @MEM[2] = %14#2 : ui8
 
     %rs2 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
     %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
@@ -107,15 +106,15 @@ coredsl.isax "SwitchStmt" {
   coredsl.instruction @NestedSwitch {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_rs2_4_0", 4, 0, 0, "rs2"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("0000000", %TREENAIL_WAS_HERE_rs2_4_0 : ui5, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "001", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0101011") {
 
 // CHECK: %0 = hwarith.constant 7 : ui3
-// CHECK: %c3 = arith.constant 3 : index
+// CHECK: %c3_i6 = arith.constant 3 : i6
 // CHECK: %1 = hwarith.constant 5 : ui3
 // CHECK: %2 = hwarith.constant 10 : ui4
-// CHECK: %c1 = arith.constant 1 : index
+// CHECK: %c1_i6 = arith.constant 1 : i6
 // CHECK: %3 = hwarith.constant 2 : ui2
-// CHECK: %c2 = arith.constant 2 : index
+// CHECK: %c2_i6 = arith.constant 2 : i6
 // CHECK: %4 = hwarith.constant 1 : ui1
-// CHECK: %c16 = arith.constant 16 : index
-// CHECK: %c0 = arith.constant 0 : index
+// CHECK: %c16_i6 = arith.constant 16 : i6
+// CHECK: %c0_i6 = arith.constant 0 : i6
 // CHECK: %5 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
 // CHECK: %6 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
 // CHECK: %7 = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
@@ -125,57 +124,55 @@ coredsl.isax "SwitchStmt" {
 // CHECK: %11 = coredsl.get @MEM[1:0] : ui16
 // CHECK: %12 = coredsl.get @MEM[2] : ui8
 // CHECK: %13 = hwarith.cast %5 : (ui5) -> i6
-// CHECK: %14 = arith.index_castui %13 : i6 to index
-// CHECK: %15 = arith.cmpi eq, %14, %c0 : index
-// CHECK: %16:3 = scf.if %15 -> (ui16, ui32, ui8) {
-// CHECK:   %17 = hwarith.cast %7 : (ui5) -> i6
-// CHECK:   %18 = arith.index_castui %17 : i6 to index
-// CHECK:   %19 = arith.cmpi eq, %18, %c16 : index
-// CHECK:   %20 = scf.if %19 -> (ui16) {
-// CHECK:     %21 = hwarith.sub %11, %4 : (ui16, ui1) -> si17
-// CHECK:     %22 = coredsl.cast %21 : si17 to ui16
-// CHECK:     scf.yield %22 : ui16
+// CHECK: %14 = arith.cmpi eq, %13, %c0_i6 : i6
+// CHECK: %15:3 = scf.if %14 -> (ui16, ui32, ui8) {
+// CHECK:   %16 = hwarith.cast %7 : (ui5) -> i6
+// CHECK:   %17 = arith.cmpi eq, %16, %c16_i6 : i6
+// CHECK:   %18 = scf.if %17 -> (ui16) {
+// CHECK:     %19 = hwarith.sub %11, %4 : (ui16, ui1) -> si17
+// CHECK:     %20 = coredsl.cast %19 : si17 to ui16
+// CHECK:     scf.yield %20 : ui16
 // CHECK:   } else {
-// CHECK:     %21 = arith.cmpi eq, %18, %c2 : index
-// CHECK:     %22 = scf.if %21 -> (ui16) {
-// CHECK:       %23 = hwarith.add %11, %4 : (ui16, ui1) -> ui17
-// CHECK:       %24 = coredsl.cast %23 : ui17 to ui16
-// CHECK:       scf.yield %24 : ui16
+// CHECK:     %19 = arith.cmpi eq, %16, %c2_i6 : i6
+// CHECK:     %20 = scf.if %19 -> (ui16) {
+// CHECK:       %21 = hwarith.add %11, %4 : (ui16, ui1) -> ui17
+// CHECK:       %22 = coredsl.cast %21 : ui17 to ui16
+// CHECK:       scf.yield %22 : ui16
 // CHECK:     } else {
-// CHECK:       %23 = hwarith.add %11, %3 : (ui16, ui2) -> ui17
-// CHECK:       %24 = coredsl.cast %23 : ui17 to ui16
-// CHECK:       scf.yield %24 : ui16
+// CHECK:       %21 = hwarith.add %11, %3 : (ui16, ui2) -> ui17
+// CHECK:       %22 = coredsl.cast %21 : ui17 to ui16
+// CHECK:       scf.yield %22 : ui16
 // CHECK:     }
-// CHECK:     scf.yield %22 : ui16
+// CHECK:     scf.yield %20 : ui16
 // CHECK:   }
-// CHECK:   scf.yield %20, %10, %12 : ui16, ui32, ui8
+// CHECK:   scf.yield %18, %10, %12 : ui16, ui32, ui8
 // CHECK: } else {
-// CHECK:   %17 = arith.cmpi eq, %14, %c1 : index
-// CHECK:   %18:3 = scf.if %17 -> (ui16, ui32, ui8) {
-// CHECK:     %19 = coredsl.cast %2 : ui4 to ui32
-// CHECK:     scf.yield %11, %19, %12 : ui16, ui32, ui8
+// CHECK:   %16 = arith.cmpi eq, %13, %c1_i6 : i6
+// CHECK:   %17:3 = scf.if %16 -> (ui16, ui32, ui8) {
+// CHECK:     %18 = coredsl.cast %2 : ui4 to ui32
+// CHECK:     scf.yield %11, %18, %12 : ui16, ui32, ui8
 // CHECK:   } else {
-// CHECK:     %19 = arith.cmpi eq, %14, %c2 : index
-// CHECK:     %20:2 = scf.if %19 -> (ui16, ui8) {
-// CHECK:       %21 = coredsl.cast %1 : ui3 to ui16
-// CHECK:       scf.yield %21, %12 : ui16, ui8
+// CHECK:     %18 = arith.cmpi eq, %13, %c2_i6 : i6
+// CHECK:     %19:2 = scf.if %18 -> (ui16, ui8) {
+// CHECK:       %20 = coredsl.cast %1 : ui3 to ui16
+// CHECK:       scf.yield %20, %12 : ui16, ui8
 // CHECK:     } else {
-// CHECK:       %21 = arith.cmpi eq, %14, %c3 : index
-// CHECK:       %22 = scf.if %21 -> (ui8) {
-// CHECK:         %23 = coredsl.cast %0 : ui3 to ui8
-// CHECK:         scf.yield %23 : ui8
+// CHECK:       %20 = arith.cmpi eq, %13, %c3_i6 : i6
+// CHECK:       %21 = scf.if %20 -> (ui8) {
+// CHECK:         %22 = coredsl.cast %0 : ui3 to ui8
+// CHECK:         scf.yield %22 : ui8
 // CHECK:       } else {
 // CHECK:         scf.yield %12 : ui8
 // CHECK:       }
-// CHECK:       scf.yield %11, %22 : ui16, ui8
+// CHECK:       scf.yield %11, %21 : ui16, ui8
 // CHECK:     }
-// CHECK:     scf.yield %20#0, %10, %20#1 : ui16, ui32, ui8
+// CHECK:     scf.yield %19#0, %10, %19#1 : ui16, ui32, ui8
 // CHECK:   }
-// CHECK:   scf.yield %18#0, %18#1, %18#2 : ui16, ui32, ui8
+// CHECK:   scf.yield %17#0, %17#1, %17#2 : ui16, ui32, ui8
 // CHECK: }
-// CHECK: coredsl.set @X[%6 : ui5] = %16#1 : ui32
-// CHECK: coredsl.set @MEM[1:0] = %16#0 : ui16
-// CHECK: coredsl.set @MEM[2] = %16#2 : ui8
+// CHECK: coredsl.set @X[%6 : ui5] = %15#1 : ui32
+// CHECK: coredsl.set @MEM[1:0] = %15#0 : ui16
+// CHECK: coredsl.set @MEM[2] = %15#2 : ui8
 
     %rs2 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
     %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
