@@ -103,8 +103,8 @@ struct CoreDSLSwitchToIf
       return signalPassFailure();
     }
     // Run a dead value removal pass, as the index casts are now dead
-    // TODO: This is a workaround to prevent crashes when deleting the index
-    // cast in the IndexSwitchToSCFIf pattern
+    // NOTE: workaround to prevent crashes when deleting the index cast in
+    // IndexSwitchToSCFIf::run
     OpPassManager finalPass{isaxOp.getOperationName()};
     finalPass.addPass(createRemoveDeadValuesPass());
     if (failed(runPipeline(finalPass, isaxOp))) {
