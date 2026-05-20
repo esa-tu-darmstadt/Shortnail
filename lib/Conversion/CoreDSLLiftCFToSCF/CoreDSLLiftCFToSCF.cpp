@@ -34,7 +34,8 @@ struct CoreDSLLiftCFToSCF
     WalkResult operator()(OpType op) {
       ControlFlowToSCFTransformation transformation;
       DominanceInfo &dominanceInfo = pass.getChildAnalysis<DominanceInfo>(op);
-      FailureOr<bool> res = transformCFGToSCF(op.getRegion(), transformation, dominanceInfo);
+      FailureOr<bool> res =
+          transformCFGToSCF(op.getRegion(), transformation, dominanceInfo);
       if (failed(res)) {
         op->emitError("Failed to convert all cf ops to scf");
         return WalkResult::interrupt();
@@ -51,24 +52,31 @@ struct CoreDSLLiftCFToSCF
     // don't need to be visited here
     bool changed = false;
     static constexpr WalkOrder ORDER = WalkOrder::PostOrder;
-    auto res = isaxOp->walk<ORDER>(RegionToSCFConverter<coredsl::InstructionOp>{*this, changed});
+    // NOTE: Treenail currently always generates an scf.execute_region operation
+    // around every cf.switch. Because of this, it is technically only necessary
+    // to run this on scf::ExecuteRegionOp and func::FuncOp
+    auto res = isaxOp->walk<ORDER>(
+        RegionToSCFConverter<coredsl::InstructionOp>{*this, changed});
     if (res == WalkResult::interrupt()) {
       return signalPassFailure();
     }
-    res = isaxOp->walk<ORDER>(RegionToSCFConverter<coredsl::AlwaysOp>{*this, changed});
+    res = isaxOp->walk<ORDER>(
+        RegionToSCFConverter<coredsl::AlwaysOp>{*this, changed});
     if (res == WalkResult::interrupt()) {
       return signalPassFailure();
     }
-    res = isaxOp->walk<ORDER>(RegionToSCFConverter<coredsl::SpawnOp>{*this, changed});
+    res = isaxOp->walk<ORDER>(
+        RegionToSCFConverter<coredsl::SpawnOp>{*this, changed});
     if (res == WalkResult::interrupt()) {
       return signalPassFailure();
     }
-    res = isaxOp->walk<ORDER>(RegionToSCFConverter<func::FuncOp>{*this, changed});
+    res =
+        isaxOp->walk<ORDER>(RegionToSCFConverter<func::FuncOp>{*this, changed});
     if (res == WalkResult::interrupt()) {
       return signalPassFailure();
     }
-    // TODO: this will always be a child of the other ops, so we could just do this recursively in the callback
-    res = isaxOp->walk<ORDER>(RegionToSCFConverter<scf::ExecuteRegionOp>{*this, changed});
+    res = isaxOp->walk<ORDER>(
+        RegionToSCFConverter<scf::ExecuteRegionOp>{*this, changed});
     if (res == WalkResult::interrupt()) {
       return signalPassFailure();
     }
