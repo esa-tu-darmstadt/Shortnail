@@ -15,21 +15,13 @@ The YAML is consumed by the Python patch generator (gen_patches.py).
 -output : Output path for the YAML analysis file
 ```
 
-### `-coredsl-lift-cf-to-scf`
-
-_Lift cf operations to scf operations_
-
-Converts all cf operations to scf operations using the ControlFlowToSCF
-Pass. This is a separate pass, as just running the ControlFlowToSCF pass
-does not work, as it does not know how to decend to the child operations
-
 ### `-coredsl-switch-to-if`
 
 _Convert cf.switch operations to scf.if_
 
 Converts all cf.switch operations to scf.if operations. To achieve this,
 the cf.switch statements are first converted to scf using the
-CoreDSLLiftCFToSCF pass. The scf.index_switch operations resulting from
+ControlFlowToSCF utility. The scf.index_switch operations resulting from
 this are then converted to a chain of scf.if
 
 ### `-coredsl-to-python`

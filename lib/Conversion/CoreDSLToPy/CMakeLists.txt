@@ -14,5 +14,5 @@ add_shortnail_library(ShortnailCoreDSLToPy
     CIRCTSupport
 
     ShortnailCoreDSL
-    ShortnailCoreDSLLiftCFToSCF
+    ShortnailCoreDSLSwitchToIf
 )

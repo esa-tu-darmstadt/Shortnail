@@ -8,11 +8,11 @@ add_shortnail_library(ShortnailCoreDSLSwitchToIf
     MLIRIR
     MLIRPass
     MLIRSCFUtils
+    MLIRControlFlowToSCF
 
     CIRCTHW
     CIRCTHWArith
     CIRCTSupport
 
     ShortnailCoreDSL
-    ShortnailCoreDSLLiftCFToSCF
 )

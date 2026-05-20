@@ -27,7 +27,6 @@ target_link_libraries(shortnail-opt
     ShortnailCoreDSL
     ShortnailAnalyzeISAX
     ShortnailCoreDSLToPy
-    ShortnailCoreDSLLiftCFToSCF
     ShortnailCoreDSLSwitchToIf
     ShortnailMergeISAX
 )

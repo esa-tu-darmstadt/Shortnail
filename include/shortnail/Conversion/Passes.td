@@ -59,26 +59,12 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
     "::circt::hwarith::HWArithDialect",
   ];
 }
-
-def CoreDSLLiftCFToSCF : Pass<"coredsl-lift-cf-to-scf", "::mlir::coredsl::ISAXOp"> {
-  let summary = "Lift cf operations to scf operations";
-  let description = [{
-    Converts all cf operations to scf operations using the ControlFlowToSCF
-    Pass. This is a separate pass, as just running the ControlFlowToSCF pass
-    does not work, as it does not know how to decend to the child operations
-  }];
-
-  let dependentDialects = [
-    "::mlir::coredsl::CoreDSLDialect",
-  ];
-}
-
 def CoreDSLSwitchToIf : Pass<"coredsl-switch-to-if", "::mlir::coredsl::ISAXOp"> {
   let summary = "Convert cf.switch operations to scf.if";
   let description = [{
     Converts all cf.switch operations to scf.if operations. To achieve this,
     the cf.switch statements are first converted to scf using the
-    CoreDSLLiftCFToSCF pass. The scf.index_switch operations resulting from
+    ControlFlowToSCF utility. The scf.index_switch operations resulting from
     this are then converted to a chain of scf.if
   }];
 
