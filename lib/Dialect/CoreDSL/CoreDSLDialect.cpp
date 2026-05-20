@@ -9,14 +9,14 @@
 #include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
+#include "circt/Dialect/HW/HWDialect.h"
+#include "circt/Dialect/HWArith/HWArithDialect.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/InliningUtils.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "circt/Dialect/HW/HWDialect.h"
-#include "circt/Dialect/HWArith/HWArithDialect.h"
 
 using namespace mlir;
 using namespace mlir::coredsl;
