@@ -34,11 +34,11 @@ struct IndexSwitchToSCFIf : public OpConversionPattern<scf::IndexSwitchOp> {
     const Location loc = op.getLoc();
     const int64_t caseVal = op.getCases()[caseIdx];
     auto arg = op.getArg();
-    // TODO: non-ui index cast (not sure if that is generated here)
     // We assume that no index ops other than the ones introduced by
     // ControlFlowToSCF exist, which means that this operation must be an
     // index_cast of the argument of the original cf.switch
-    assert(isa<arith::IndexCastUIOp>(arg.getDefiningOp()));
+    assert(isa<arith::IndexCastUIOp>(arg.getDefiningOp()) &&
+           "ControlFlowToSCF pass should only generate arith::IndexCastUIOp");
     auto indexCast = dyn_cast<arith::IndexCastUIOp>(arg.getDefiningOp());
     auto nonIndexArg = indexCast.getOperand();
     auto cmpType = dyn_cast<IntegerType>(nonIndexArg.getType());
@@ -103,7 +103,8 @@ struct CoreDSLSwitchToIf
       return signalPassFailure();
     }
     // Run a dead value removal pass, as the index casts are now dead
-    // TODO: there has got to be an easier solution for this!!!!
+    // TODO: This is a workaround to prevent crashes when deleting the index
+    // cast in the IndexSwitchToSCFIf pattern
     OpPassManager finalPass{isaxOp.getOperationName()};
     finalPass.addPass(createRemoveDeadValuesPass());
     if (failed(runPipeline(finalPass, isaxOp))) {
