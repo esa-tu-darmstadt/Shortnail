@@ -70,6 +70,8 @@ def CoreDSLSwitchToIf : Pass<"coredsl-switch-to-if", "::mlir::coredsl::ISAXOp"> 
 
   let dependentDialects = [
     "::mlir::coredsl::CoreDSLDialect",
+    // Necessary because removeDeadValues pass creates ub.poison
+    "::mlir::ub::UBDialect",
   ];
 }
 
