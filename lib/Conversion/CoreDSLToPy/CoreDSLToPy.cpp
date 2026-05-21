@@ -830,8 +830,6 @@ struct CoreDSLToPy
     auto isaxOp = getOperation();
 
     OpPassManager inlinePM(isaxOp.getOperationName());
-    // Before inliing, convert all cf operations to scf
-    inlinePM.addPass(createCoreDSLSwitchToIf());
     // Inline all functions into the InstructionOps
     inlinePM.addPass(createInlinerPass());
     if (failed(runPipeline(inlinePM, isaxOp)))
