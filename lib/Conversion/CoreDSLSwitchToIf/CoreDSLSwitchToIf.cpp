@@ -48,11 +48,9 @@ struct IndexSwitchToSCFIf : public OpConversionPattern<scf::IndexSwitchOp> {
     assert(isa<hwarith::CastOp>(nonIndexArg.getDefiningOp()));
     auto signlessCast = cast<hwarith::CastOp>(nonIndexArg.getDefiningOp());
     auto hwarithValue = signlessCast.getOperand();
-    auto cmpType = dyn_cast<IntegerType>(hwarithValue.getType());
-    assert(cmpType);
-    auto caseAttr = IntegerAttr::get(cmpType, caseVal);
-    auto constant =
-        hwarith::ConstantOp::create(rewriter, loc, cmpType, caseAttr);
+    auto cmpType = cast<IntegerType>(hwarithValue.getType());
+    auto constant = hwarith::ConstantOp::create(
+        rewriter, loc, cmpType, IntegerAttr::get(cmpType, caseVal));
     auto compareOp = hwarith::ICmpOp::create(
         rewriter, loc, hwarith::ICmpPredicate::eq, hwarithValue, constant);
     auto resultOp =
