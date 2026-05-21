@@ -55,6 +55,7 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
   }];
   let dependentDialects = [
     "::mlir::coredsl::CoreDSLDialect",
+    "::mlir::ub::UBDialect",
     "::circt::hw::HWDialect",
     "::circt::hwarith::HWArithDialect",
   ];
