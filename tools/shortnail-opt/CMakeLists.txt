@@ -24,10 +24,10 @@ target_link_libraries(shortnail-opt
     CIRCTSV
     CIRCTSVTransforms
 
-    ShortnailCoreDSL
     ShortnailAnalyzeISAX
-    ShortnailCoreDSLToPy
+    ShortnailCoreDSL
     ShortnailCoreDSLSwitchToIf
+    ShortnailCoreDSLToPy
     ShortnailMergeISAX
 )
 
