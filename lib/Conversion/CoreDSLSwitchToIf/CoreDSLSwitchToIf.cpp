@@ -10,6 +10,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 
 namespace mlir {
 namespace shortnail {
@@ -42,14 +43,18 @@ struct IndexSwitchToSCFIf : public OpConversionPattern<scf::IndexSwitchOp> {
            "ControlFlowToSCF pass should only generate arith::IndexCastUIOp");
     auto indexCast = dyn_cast<arith::IndexCastUIOp>(arg.getDefiningOp());
     auto nonIndexArg = indexCast.getOperand();
-    auto cmpType = dyn_cast<IntegerType>(nonIndexArg.getType());
+    // Non index arg must be a signless integer, but it has to have been created
+    // by converting a signed integer to signless
+    assert(isa<hwarith::CastOp>(nonIndexArg.getDefiningOp()));
+    auto signlessCast = cast<hwarith::CastOp>(nonIndexArg.getDefiningOp());
+    auto hwarithValue = signlessCast.getOperand();
+    auto cmpType = dyn_cast<IntegerType>(hwarithValue.getType());
     assert(cmpType);
     auto caseAttr = IntegerAttr::get(cmpType, caseVal);
-    // Because cf.switch only supports signless integers as arguments, we can't
-    // use hwarith operations for the comparisons
-    auto constant = arith::ConstantOp::create(rewriter, loc, cmpType, caseAttr);
-    auto compareOp = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq, constant, nonIndexArg);
+    auto constant =
+        hwarith::ConstantOp::create(rewriter, loc, cmpType, caseAttr);
+    auto compareOp = hwarith::ICmpOp::create(
+        rewriter, loc, hwarith::ICmpPredicate::eq, hwarithValue, constant);
     auto resultOp =
         scf::IfOp::create(rewriter, loc, op.getResultTypes(), compareOp, true);
     Block *thenBlock = &resultOp.getThenRegion().front();
