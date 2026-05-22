@@ -1,61 +1,9 @@
 // RUN: shortnail-opt %s -coredsl-switch-to-if -canonicalize | shortnail-opt | FileCheck %s
 
 coredsl.isax "SwitchStmt" {
-// CHECK: coredsl.isax "SwitchStmt"
   coredsl.register core_x @X[32] : ui32
   coredsl.addrspace core_mem @MEM : (ui32) -> ui8
   coredsl.instruction @Simple {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_rs2_4_0", 4, 0, 0, "rs2"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("0000000", %TREENAIL_WAS_HERE_rs2_4_0 : ui5, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "001", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0101011") {
-
-// CHECK: %0 = hwarith.constant 1 : ui1
-// CHECK: %1 = hwarith.constant 7 : ui3
-// CHECK: %2 = hwarith.constant 3 : ui5
-// CHECK: %3 = hwarith.constant 5 : ui3
-// CHECK: %4 = hwarith.constant 2 : ui5
-// CHECK: %5 = hwarith.constant 10 : ui4
-// CHECK: %6 = hwarith.constant 1 : ui5
-// CHECK: %7 = hwarith.constant 0 : ui5
-// CHECK: %8 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
-// CHECK: %9 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
-// CHECK: %10 = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
-// CHECK: %11 = coredsl.cast %10 : ui5 to ui32
-// CHECK: %12 = coredsl.get @MEM[%11 : ui32] : ui8
-// CHECK: %13 = coredsl.cast %12 : ui8 to ui32
-// CHECK: %14 = coredsl.get @MEM[1:0] : ui16
-// CHECK: %15 = coredsl.get @MEM[2] : ui8
-// CHECK: %16 = hwarith.icmp eq %8, %7 : ui5, ui5
-// CHECK: %17:3 = scf.if %16 -> (ui32, ui16, ui8) {
-// CHECK:   scf.yield %13, %14, %15 : ui32, ui16, ui8
-// CHECK: } else {
-// CHECK:   %18 = hwarith.icmp eq %8, %6 : ui5, ui5
-// CHECK:   %19:3 = scf.if %18 -> (ui32, ui16, ui8) {
-// CHECK:     %20 = coredsl.cast %5 : ui4 to ui32
-// CHECK:     scf.yield %20, %14, %15 : ui32, ui16, ui8
-// CHECK:   } else {
-// CHECK:     %20 = hwarith.icmp eq %8, %4 : ui5, ui5
-// CHECK:     %21:3 = scf.if %20 -> (ui32, ui16, ui8) {
-// CHECK:       %22 = coredsl.cast %3 : ui3 to ui16
-// CHECK:       scf.yield %13, %22, %15 : ui32, ui16, ui8
-// CHECK:     } else {
-// CHECK:       %22 = hwarith.icmp eq %8, %2 : ui5, ui5
-// CHECK:       %23:3 = scf.if %22 -> (ui32, ui16, ui8) {
-// CHECK:         %24 = coredsl.cast %1 : ui3 to ui8
-// CHECK:         scf.yield %13, %14, %24 : ui32, ui16, ui8
-// CHECK:       } else {
-// CHECK:         %24 = coredsl.cast %0 : ui1 to ui32
-// CHECK:         %25 = coredsl.cast %0 : ui1 to ui16
-// CHECK:         %26 = coredsl.cast %0 : ui1 to ui8
-// CHECK:         scf.yield %24, %25, %26 : ui32, ui16, ui8
-// CHECK:       }
-// CHECK:       scf.yield %23#0, %23#1, %23#2 : ui32, ui16, ui8
-// CHECK:     }
-// CHECK:     scf.yield %21#0, %21#1, %21#2 : ui32, ui16, ui8
-// CHECK:   }
-// CHECK:   scf.yield %19#0, %19#1, %19#2 : ui32, ui16, ui8
-// CHECK: }
-// CHECK: coredsl.set @X[%9 : ui5] = %17#0 : ui32
-// CHECK: coredsl.set @MEM[1:0] = %17#1 : ui16
-// CHECK: coredsl.set @MEM[2] = %17#2 : ui8
-
     %rs2 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
     %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
     %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
@@ -104,74 +52,6 @@ coredsl.isax "SwitchStmt" {
     coredsl.end
   }
   coredsl.instruction @NestedSwitch {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_rs2_4_0", 4, 0, 0, "rs2"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("0000000", %TREENAIL_WAS_HERE_rs2_4_0 : ui5, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "001", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0101011") {
-
-// CHECK: %0 = hwarith.constant 7 : ui3
-// CHECK: %1 = hwarith.constant 3 : ui5
-// CHECK: %2 = hwarith.constant 5 : ui3
-// CHECK: %3 = hwarith.constant 10 : ui4
-// CHECK: %4 = hwarith.constant 1 : ui5
-// CHECK: %5 = hwarith.constant 2 : ui2
-// CHECK: %6 = hwarith.constant 2 : ui5
-// CHECK: %7 = hwarith.constant 1 : ui1
-// CHECK: %8 = hwarith.constant 16 : ui5
-// CHECK: %9 = hwarith.constant 0 : ui5
-// CHECK: %10 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
-// CHECK: %11 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
-// CHECK: %12 = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
-// CHECK: %13 = coredsl.cast %12 : ui5 to ui32
-// CHECK: %14 = coredsl.get @MEM[%13 : ui32] : ui8
-// CHECK: %15 = coredsl.cast %14 : ui8 to ui32
-// CHECK: %16 = coredsl.get @MEM[1:0] : ui16
-// CHECK: %17 = coredsl.get @MEM[2] : ui8
-// CHECK: %18 = hwarith.icmp eq %10, %9 : ui5, ui5
-// CHECK: %19:3 = scf.if %18 -> (ui16, ui32, ui8) {
-// CHECK:   %20 = hwarith.icmp eq %12, %8 : ui5, ui5
-// CHECK:   %21 = scf.if %20 -> (ui16) {
-// CHECK:     %22 = hwarith.sub %16, %7 : (ui16, ui1) -> si17
-// CHECK:     %23 = coredsl.cast %22 : si17 to ui16
-// CHECK:     scf.yield %23 : ui16
-// CHECK:   } else {
-// CHECK:     %22 = hwarith.icmp eq %12, %6 : ui5, ui5
-// CHECK:     %23 = scf.if %22 -> (ui16) {
-// CHECK:       %24 = hwarith.add %16, %7 : (ui16, ui1) -> ui17
-// CHECK:       %25 = coredsl.cast %24 : ui17 to ui16
-// CHECK:       scf.yield %25 : ui16
-// CHECK:     } else {
-// CHECK:       %24 = hwarith.add %16, %5 : (ui16, ui2) -> ui17
-// CHECK:       %25 = coredsl.cast %24 : ui17 to ui16
-// CHECK:       scf.yield %25 : ui16
-// CHECK:     }
-// CHECK:     scf.yield %23 : ui16
-// CHECK:   }
-// CHECK:   scf.yield %21, %15, %17 : ui16, ui32, ui8
-// CHECK: } else {
-// CHECK:   %20 = hwarith.icmp eq %10, %4 : ui5, ui5
-// CHECK:   %21:3 = scf.if %20 -> (ui16, ui32, ui8) {
-// CHECK:     %22 = coredsl.cast %3 : ui4 to ui32
-// CHECK:     scf.yield %16, %22, %17 : ui16, ui32, ui8
-// CHECK:   } else {
-// CHECK:     %22 = hwarith.icmp eq %10, %6 : ui5, ui5
-// CHECK:     %23:2 = scf.if %22 -> (ui16, ui8) {
-// CHECK:       %24 = coredsl.cast %2 : ui3 to ui16
-// CHECK:       scf.yield %24, %17 : ui16, ui8
-// CHECK:     } else {
-// CHECK:       %24 = hwarith.icmp eq %10, %1 : ui5, ui5
-// CHECK:       %25 = scf.if %24 -> (ui8) {
-// CHECK:         %26 = coredsl.cast %0 : ui3 to ui8
-// CHECK:         scf.yield %26 : ui8
-// CHECK:       } else {
-// CHECK:         scf.yield %17 : ui8
-// CHECK:       }
-// CHECK:       scf.yield %16, %25 : ui16, ui8
-// CHECK:     }
-// CHECK:     scf.yield %23#0, %15, %23#1 : ui16, ui32, ui8
-// CHECK:   }
-// CHECK:   scf.yield %21#0, %21#1, %21#2 : ui16, ui32, ui8
-// CHECK: }
-// CHECK: coredsl.set @X[%11 : ui5] = %19#1 : ui32
-// CHECK: coredsl.set @MEM[1:0] = %19#0 : ui16
-// CHECK: coredsl.set @MEM[2] = %19#2 : ui8
-
     %rs2 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
     %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
     %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
@@ -237,24 +117,6 @@ coredsl.isax "SwitchStmt" {
     coredsl.end
   }
   coredsl.instruction @DefaultOnlySwitch {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_rs2_4_0", 4, 0, 0, "rs2"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("0000000", %TREENAIL_WAS_HERE_rs2_4_0 : ui5, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "001", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0101011") {
-
-// CHECK: %0 = hwarith.constant 5 : ui3
-// CHECK: %1 = hwarith.constant 10 : ui4
-// CHECK: %2 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
-// CHECK: %3 = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
-// CHECK: %4 = coredsl.cast %3 : ui5 to ui32
-// CHECK: %5 = coredsl.get @MEM[%4 : ui32] : ui8
-// CHECK: %6 = coredsl.get @MEM[1:0] : ui16
-// CHECK: %7 = coredsl.get @MEM[2] : ui8
-// CHECK: %8 = coredsl.cast %2 : ui5 to ui32
-// CHECK: %9 = coredsl.get @MEM[%8 : ui32] : ui8
-// CHECK: %10 = coredsl.cast %9 : ui8 to ui32
-// CHECK: %11 = coredsl.cast %1 : ui4 to ui16
-// CHECK: %12 = coredsl.cast %0 : ui3 to ui8
-// CHECK: coredsl.set @X[%2 : ui5] = %10 : ui32
-// CHECK: coredsl.set @MEM[1:0] = %11 : ui16
-// CHECK: coredsl.set @MEM[2] = %12 : ui8
-
     %rs2 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
     %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
     %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
@@ -287,3 +149,147 @@ coredsl.isax "SwitchStmt" {
   }
 }
 
+// CHECK-LABEL:   coredsl.isax "SwitchStmt" {
+// CHECK:           coredsl.register core_x @X[32]  : ui32
+// CHECK:           coredsl.addrspace core_mem @MEM : (ui32) -> ui8
+// CHECK:           coredsl.instruction @Simple {lil.enc_immediates = {{\[\[}}["%[[VAL_0:.*]]", 4, 0, 0, "rs2"]], {{\[\[}}"%[[VAL_1:.*]]", 4, 0, 0, "rs1"]], {{\[\[}}"%[[VAL_2:.*]]", 4, 0, 0, "rd"]]]}("0000000", %[[VAL_0]] : ui5, %[[VAL_1]] : ui5, "001", %[[VAL_2]] : ui5, "0101011"){
+// CHECK:             %[[CONSTANT_0:.*]] = hwarith.constant 1 : ui1
+// CHECK:             %[[CONSTANT_1:.*]] = hwarith.constant 7 : ui3
+// CHECK:             %[[CONSTANT_2:.*]] = hwarith.constant 3 : ui5
+// CHECK:             %[[CONSTANT_3:.*]] = hwarith.constant 5 : ui3
+// CHECK:             %[[CONSTANT_4:.*]] = hwarith.constant 2 : ui5
+// CHECK:             %[[CONSTANT_5:.*]] = hwarith.constant 10 : ui4
+// CHECK:             %[[CONSTANT_6:.*]] = hwarith.constant 1 : ui5
+// CHECK:             %[[CONSTANT_7:.*]] = hwarith.constant 0 : ui5
+// CHECK:             %[[CAST_0:.*]] = coredsl.cast %[[VAL_0]] : ui5 to ui5
+// CHECK:             %[[CAST_1:.*]] = coredsl.cast %[[VAL_1]] : ui5 to ui5
+// CHECK:             %[[CAST_2:.*]] = coredsl.cast %[[VAL_2]] : ui5 to ui5
+// CHECK:             %[[CAST_3:.*]] = coredsl.cast %[[CAST_2]] : ui5 to ui32
+// CHECK:             %[[GET_0:.*]] = coredsl.get @MEM{{\[}}%[[CAST_3]] : ui32] : ui8
+// CHECK:             %[[CAST_4:.*]] = coredsl.cast %[[GET_0]] : ui8 to ui32
+// CHECK:             %[[GET_1:.*]] = coredsl.get @MEM[1:0] : ui16
+// CHECK:             %[[GET_2:.*]] = coredsl.get @MEM[2] : ui8
+// CHECK:             %[[ICMP_0:.*]] = hwarith.icmp eq %[[CAST_0]], %[[CONSTANT_7]] : ui5, ui5
+// CHECK:             %[[IF_0:.*]]:3 = scf.if %[[ICMP_0]] -> (ui32, ui16, ui8) {
+// CHECK:               scf.yield %[[CAST_4]], %[[GET_1]], %[[GET_2]] : ui32, ui16, ui8
+// CHECK:             } else {
+// CHECK:               %[[ICMP_1:.*]] = hwarith.icmp eq %[[CAST_0]], %[[CONSTANT_6]] : ui5, ui5
+// CHECK:               %[[IF_1:.*]]:3 = scf.if %[[ICMP_1]] -> (ui32, ui16, ui8) {
+// CHECK:                 %[[CAST_5:.*]] = coredsl.cast %[[CONSTANT_5]] : ui4 to ui32
+// CHECK:                 scf.yield %[[CAST_5]], %[[GET_1]], %[[GET_2]] : ui32, ui16, ui8
+// CHECK:               } else {
+// CHECK:                 %[[ICMP_2:.*]] = hwarith.icmp eq %[[CAST_0]], %[[CONSTANT_4]] : ui5, ui5
+// CHECK:                 %[[IF_2:.*]]:3 = scf.if %[[ICMP_2]] -> (ui32, ui16, ui8) {
+// CHECK:                   %[[CAST_6:.*]] = coredsl.cast %[[CONSTANT_3]] : ui3 to ui16
+// CHECK:                   scf.yield %[[CAST_4]], %[[CAST_6]], %[[GET_2]] : ui32, ui16, ui8
+// CHECK:                 } else {
+// CHECK:                   %[[ICMP_3:.*]] = hwarith.icmp eq %[[CAST_0]], %[[CONSTANT_2]] : ui5, ui5
+// CHECK:                   %[[IF_3:.*]]:3 = scf.if %[[ICMP_3]] -> (ui32, ui16, ui8) {
+// CHECK:                     %[[CAST_7:.*]] = coredsl.cast %[[CONSTANT_1]] : ui3 to ui8
+// CHECK:                     scf.yield %[[CAST_4]], %[[GET_1]], %[[CAST_7]] : ui32, ui16, ui8
+// CHECK:                   } else {
+// CHECK:                     %[[CAST_8:.*]] = coredsl.cast %[[CONSTANT_0]] : ui1 to ui32
+// CHECK:                     %[[CAST_9:.*]] = coredsl.cast %[[CONSTANT_0]] : ui1 to ui16
+// CHECK:                     %[[CAST_10:.*]] = coredsl.cast %[[CONSTANT_0]] : ui1 to ui8
+// CHECK:                     scf.yield %[[CAST_8]], %[[CAST_9]], %[[CAST_10]] : ui32, ui16, ui8
+// CHECK:                   }
+// CHECK:                   scf.yield %[[VAL_3:.*]]#0, %[[VAL_3]]#1, %[[VAL_3]]#2 : ui32, ui16, ui8
+// CHECK:                 }
+// CHECK:                 scf.yield %[[VAL_4:.*]]#0, %[[VAL_4]]#1, %[[VAL_4]]#2 : ui32, ui16, ui8
+// CHECK:               }
+// CHECK:               scf.yield %[[VAL_5:.*]]#0, %[[VAL_5]]#1, %[[VAL_5]]#2 : ui32, ui16, ui8
+// CHECK:             }
+// CHECK:             coredsl.set @X{{\[}}%[[CAST_1]] : ui5] = %[[VAL_6:.*]]#0 : ui32
+// CHECK:             coredsl.set @MEM[1:0] = %[[VAL_6]]#1 : ui16
+// CHECK:             coredsl.set @MEM[2] = %[[VAL_6]]#2 : ui8
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:           coredsl.instruction @NestedSwitch {lil.enc_immediates = {{\[\[}}["%[[VAL_7:.*]]", 4, 0, 0, "rs2"]], {{\[\[}}"%[[VAL_8:.*]]", 4, 0, 0, "rs1"]], {{\[\[}}"%[[VAL_9:.*]]", 4, 0, 0, "rd"]]]}("0000000", %[[VAL_7]] : ui5, %[[VAL_8]] : ui5, "001", %[[VAL_9]] : ui5, "0101011"){
+// CHECK:             %[[CONSTANT_8:.*]] = hwarith.constant 7 : ui3
+// CHECK:             %[[CONSTANT_9:.*]] = hwarith.constant 3 : ui5
+// CHECK:             %[[CONSTANT_10:.*]] = hwarith.constant 5 : ui3
+// CHECK:             %[[CONSTANT_11:.*]] = hwarith.constant 10 : ui4
+// CHECK:             %[[CONSTANT_12:.*]] = hwarith.constant 1 : ui5
+// CHECK:             %[[CONSTANT_13:.*]] = hwarith.constant 2 : ui2
+// CHECK:             %[[CONSTANT_14:.*]] = hwarith.constant 2 : ui5
+// CHECK:             %[[CONSTANT_15:.*]] = hwarith.constant 1 : ui1
+// CHECK:             %[[CONSTANT_16:.*]] = hwarith.constant 16 : ui5
+// CHECK:             %[[CONSTANT_17:.*]] = hwarith.constant 0 : ui5
+// CHECK:             %[[CAST_11:.*]] = coredsl.cast %[[VAL_7]] : ui5 to ui5
+// CHECK:             %[[CAST_12:.*]] = coredsl.cast %[[VAL_8]] : ui5 to ui5
+// CHECK:             %[[CAST_13:.*]] = coredsl.cast %[[VAL_9]] : ui5 to ui5
+// CHECK:             %[[CAST_14:.*]] = coredsl.cast %[[CAST_13]] : ui5 to ui32
+// CHECK:             %[[GET_3:.*]] = coredsl.get @MEM{{\[}}%[[CAST_14]] : ui32] : ui8
+// CHECK:             %[[CAST_15:.*]] = coredsl.cast %[[GET_3]] : ui8 to ui32
+// CHECK:             %[[GET_4:.*]] = coredsl.get @MEM[1:0] : ui16
+// CHECK:             %[[GET_5:.*]] = coredsl.get @MEM[2] : ui8
+// CHECK:             %[[ICMP_4:.*]] = hwarith.icmp eq %[[CAST_11]], %[[CONSTANT_17]] : ui5, ui5
+// CHECK:             %[[IF_4:.*]]:3 = scf.if %[[ICMP_4]] -> (ui16, ui32, ui8) {
+// CHECK:               %[[ICMP_5:.*]] = hwarith.icmp eq %[[CAST_13]], %[[CONSTANT_16]] : ui5, ui5
+// CHECK:               %[[IF_5:.*]] = scf.if %[[ICMP_5]] -> (ui16) {
+// CHECK:                 %[[SUB_0:.*]] = hwarith.sub %[[GET_4]], %[[CONSTANT_15]] : (ui16, ui1) -> si17
+// CHECK:                 %[[CAST_16:.*]] = coredsl.cast %[[SUB_0]] : si17 to ui16
+// CHECK:                 scf.yield %[[CAST_16]] : ui16
+// CHECK:               } else {
+// CHECK:                 %[[ICMP_6:.*]] = hwarith.icmp eq %[[CAST_13]], %[[CONSTANT_14]] : ui5, ui5
+// CHECK:                 %[[IF_6:.*]] = scf.if %[[ICMP_6]] -> (ui16) {
+// CHECK:                   %[[ADD_0:.*]] = hwarith.add %[[GET_4]], %[[CONSTANT_15]] : (ui16, ui1) -> ui17
+// CHECK:                   %[[CAST_17:.*]] = coredsl.cast %[[ADD_0]] : ui17 to ui16
+// CHECK:                   scf.yield %[[CAST_17]] : ui16
+// CHECK:                 } else {
+// CHECK:                   %[[ADD_1:.*]] = hwarith.add %[[GET_4]], %[[CONSTANT_13]] : (ui16, ui2) -> ui17
+// CHECK:                   %[[CAST_18:.*]] = coredsl.cast %[[ADD_1]] : ui17 to ui16
+// CHECK:                   scf.yield %[[CAST_18]] : ui16
+// CHECK:                 }
+// CHECK:                 scf.yield %[[IF_6]] : ui16
+// CHECK:               }
+// CHECK:               scf.yield %[[IF_5]], %[[CAST_15]], %[[GET_5]] : ui16, ui32, ui8
+// CHECK:             } else {
+// CHECK:               %[[ICMP_7:.*]] = hwarith.icmp eq %[[CAST_11]], %[[CONSTANT_12]] : ui5, ui5
+// CHECK:               %[[IF_7:.*]]:3 = scf.if %[[ICMP_7]] -> (ui16, ui32, ui8) {
+// CHECK:                 %[[CAST_19:.*]] = coredsl.cast %[[CONSTANT_11]] : ui4 to ui32
+// CHECK:                 scf.yield %[[GET_4]], %[[CAST_19]], %[[GET_5]] : ui16, ui32, ui8
+// CHECK:               } else {
+// CHECK:                 %[[ICMP_8:.*]] = hwarith.icmp eq %[[CAST_11]], %[[CONSTANT_14]] : ui5, ui5
+// CHECK:                 %[[IF_8:.*]]:2 = scf.if %[[ICMP_8]] -> (ui16, ui8) {
+// CHECK:                   %[[CAST_20:.*]] = coredsl.cast %[[CONSTANT_10]] : ui3 to ui16
+// CHECK:                   scf.yield %[[CAST_20]], %[[GET_5]] : ui16, ui8
+// CHECK:                 } else {
+// CHECK:                   %[[ICMP_9:.*]] = hwarith.icmp eq %[[CAST_11]], %[[CONSTANT_9]] : ui5, ui5
+// CHECK:                   %[[IF_9:.*]] = scf.if %[[ICMP_9]] -> (ui8) {
+// CHECK:                     %[[CAST_21:.*]] = coredsl.cast %[[CONSTANT_8]] : ui3 to ui8
+// CHECK:                     scf.yield %[[CAST_21]] : ui8
+// CHECK:                   } else {
+// CHECK:                     scf.yield %[[GET_5]] : ui8
+// CHECK:                   }
+// CHECK:                   scf.yield %[[GET_4]], %[[IF_9]] : ui16, ui8
+// CHECK:                 }
+// CHECK:                 scf.yield %[[VAL_10:.*]]#0, %[[CAST_15]], %[[VAL_10]]#1 : ui16, ui32, ui8
+// CHECK:               }
+// CHECK:               scf.yield %[[VAL_11:.*]]#0, %[[VAL_11]]#1, %[[VAL_11]]#2 : ui16, ui32, ui8
+// CHECK:             }
+// CHECK:             coredsl.set @X{{\[}}%[[CAST_12]] : ui5] = %[[VAL_12:.*]]#1 : ui32
+// CHECK:             coredsl.set @MEM[1:0] = %[[VAL_12]]#0 : ui16
+// CHECK:             coredsl.set @MEM[2] = %[[VAL_12]]#2 : ui8
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:           coredsl.instruction @DefaultOnlySwitch {lil.enc_immediates = {{\[\[}}["%[[VAL_13:.*]]", 4, 0, 0, "rs2"]], {{\[\[}}"%[[VAL_14:.*]]", 4, 0, 0, "rs1"]], {{\[\[}}"%[[VAL_15:.*]]", 4, 0, 0, "rd"]]]}("0000000", %[[VAL_13]] : ui5, %[[VAL_14]] : ui5, "001", %[[VAL_15]] : ui5, "0101011"){
+// CHECK:             %[[CONSTANT_18:.*]] = hwarith.constant 5 : ui3
+// CHECK:             %[[CONSTANT_19:.*]] = hwarith.constant 10 : ui4
+// CHECK:             %[[CAST_22:.*]] = coredsl.cast %[[VAL_14]] : ui5 to ui5
+// CHECK:             %[[CAST_23:.*]] = coredsl.cast %[[VAL_15]] : ui5 to ui5
+// CHECK:             %[[CAST_24:.*]] = coredsl.cast %[[CAST_23]] : ui5 to ui32
+// CHECK:             %[[GET_6:.*]] = coredsl.get @MEM{{\[}}%[[CAST_24]] : ui32] : ui8
+// CHECK:             %[[GET_7:.*]] = coredsl.get @MEM[1:0] : ui16
+// CHECK:             %[[GET_8:.*]] = coredsl.get @MEM[2] : ui8
+// CHECK:             %[[CAST_25:.*]] = coredsl.cast %[[CAST_22]] : ui5 to ui32
+// CHECK:             %[[GET_9:.*]] = coredsl.get @MEM{{\[}}%[[CAST_25]] : ui32] : ui8
+// CHECK:             %[[CAST_26:.*]] = coredsl.cast %[[GET_9]] : ui8 to ui32
+// CHECK:             %[[CAST_27:.*]] = coredsl.cast %[[CONSTANT_19]] : ui4 to ui16
+// CHECK:             %[[CAST_28:.*]] = coredsl.cast %[[CONSTANT_18]] : ui3 to ui8
+// CHECK:             coredsl.set @X{{\[}}%[[CAST_22]] : ui5] = %[[CAST_26]] : ui32
+// CHECK:             coredsl.set @MEM[1:0] = %[[CAST_27]] : ui16
+// CHECK:             coredsl.set @MEM[2] = %[[CAST_28]] : ui8
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:         }
