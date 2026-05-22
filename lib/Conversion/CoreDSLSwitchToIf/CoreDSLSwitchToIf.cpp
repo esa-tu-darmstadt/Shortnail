@@ -168,12 +168,12 @@ struct CoreDSLSwitchToIf
     // know how to deal with them
     // First delete the IndexCastOps, then the hwarith::CastOps, because the
     // IndexCastOp is their only use
-    isaxOp->walk([](arith::IndexCastOp op){
+    isaxOp->walk([](arith::IndexCastOp op) {
       if (op->use_empty()) {
         op->erase();
       }
     });
-    isaxOp->walk([](hwarith::CastOp op){
+    isaxOp->walk([](hwarith::CastOp op) {
       if (op->use_empty()) {
         op->erase();
       }
