@@ -59,8 +59,9 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
     "::circt::hwarith::HWArithDialect",
   ];
 }
-def CoreDSLSwitchToIf : Pass<"coredsl-switch-to-if", "::mlir::coredsl::ISAXOp"> {
-  let summary = "Convert cf.switch operations to scf.if";
+
+def CoreDSLLegalizeCF : Pass<"coredsl-legalize-cf", "::mlir::coredsl::ISAXOp"> {
+  let summary = "Legalize cf operations by converting them to scf";
   let description = [{
     Converts all cf.switch operations to scf.if operations. To achieve this,
     the cf.switch statements are first converted to scf using the

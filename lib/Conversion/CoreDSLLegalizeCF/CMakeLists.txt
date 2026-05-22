@@ -1,5 +1,5 @@
-add_shortnail_library(ShortnailCoreDSLSwitchToIf
-    CoreDSLSwitchToIf.cpp
+add_shortnail_library(ShortnailCoreDSLLegalizeCF
+    CoreDSLLegalizeCF.cpp
 
     DEPENDS
     MLIRConversionPassIncGen

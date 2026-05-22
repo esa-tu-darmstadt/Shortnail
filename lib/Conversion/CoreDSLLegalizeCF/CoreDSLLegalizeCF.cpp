@@ -13,7 +13,7 @@
 
 namespace mlir {
 namespace shortnail {
-#define GEN_PASS_DEF_COREDSLSWITCHTOIF
+#define GEN_PASS_DEF_COREDSLLEGALIZECF
 #include "shortnail/Conversion/Passes.h.inc"
 } // namespace shortnail
 } // namespace mlir
@@ -82,15 +82,15 @@ struct IndexSwitchToSCFIf : public OpConversionPattern<scf::IndexSwitchOp> {
 } // anonymous namespace
 
 namespace {
-struct CoreDSLSwitchToIf
-    : public mlir::shortnail::impl::CoreDSLSwitchToIfBase<CoreDSLSwitchToIf> {
-  using CoreDSLSwitchToIfBase::CoreDSLSwitchToIfBase;
+struct CoreDSLLegalizeCF
+    : public mlir::shortnail::impl::CoreDSLLegalizeCFBase<CoreDSLLegalizeCF> {
+  using CoreDSLLegalizeCFBase::CoreDSLLegalizeCFBase;
   // This needs to be a class rather than a lambda because we cannot have
   // templated lambdas and this needs to be explicitly instantiated with
   // multiple op types for the walk method
   template <typename OpType>
   struct RegionToSCFConverter {
-    CoreDSLSwitchToIf &pass;
+    CoreDSLLegalizeCF &pass;
     bool &changed;
 
     WalkResult operator()(OpType op) {

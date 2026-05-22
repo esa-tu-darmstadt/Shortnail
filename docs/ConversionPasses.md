@@ -15,9 +15,9 @@ The YAML is consumed by the Python patch generator (gen_patches.py).
 -output : Output path for the YAML analysis file
 ```
 
-### `-coredsl-switch-to-if`
+### `-coredsl-legalize-cf`
 
-_Convert cf.switch operations to scf.if_
+_Legalize cf operations by converting them to scf_
 
 Converts all cf.switch operations to scf.if operations. To achieve this,
 the cf.switch statements are first converted to scf using the

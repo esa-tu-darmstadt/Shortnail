@@ -1,4 +1,4 @@
-// RUN: shortnail-opt %s -coredsl-switch-to-if -canonicalize | shortnail-opt | FileCheck %s
+// RUN: shortnail-opt %s -coredsl-legalize-cf -canonicalize | shortnail-opt | FileCheck %s
 
 coredsl.isax "SwitchStmt" {
   coredsl.register core_x @X[32] : ui32
