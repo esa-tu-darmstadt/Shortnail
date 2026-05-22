@@ -24,8 +24,9 @@ target_link_libraries(shortnail-opt
     CIRCTSV
     CIRCTSVTransforms
 
-    ShortnailCoreDSL
     ShortnailAnalyzeISAX
+    ShortnailCoreDSL
+    ShortnailCoreDSLLegalizeCF
     ShortnailCoreDSLToPy
     ShortnailMergeISAX
 )

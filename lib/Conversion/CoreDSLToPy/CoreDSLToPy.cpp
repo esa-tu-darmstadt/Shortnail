@@ -828,8 +828,8 @@ struct CoreDSLToPy
   void runOnOperation() override {
     auto isaxOp = getOperation();
 
-    // Inline all functions into the InstructionOps
     OpPassManager inlinePM(isaxOp.getOperationName());
+    // Inline all functions into the InstructionOps
     inlinePM.addPass(createInlinerPass());
     if (failed(runPipeline(inlinePM, isaxOp)))
       return signalPassFailure();

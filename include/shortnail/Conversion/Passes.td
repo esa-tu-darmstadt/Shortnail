@@ -60,6 +60,20 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
   ];
 }
 
+def CoreDSLLegalizeCF : Pass<"coredsl-legalize-cf", "::mlir::coredsl::ISAXOp"> {
+  let summary = "Legalize cf operations by converting them to scf";
+  let description = [{
+    Converts all cf.switch operations to scf.if operations. To achieve this,
+    the cf.switch statements are first converted to scf using the
+    ControlFlowToSCF utility. The scf.index_switch operations resulting from
+    this are then converted to a chain of scf.if
+  }];
+
+  let dependentDialects = [
+    "::mlir::coredsl::CoreDSLDialect",
+  ];
+}
+
 def AnalyzeISAX : Pass<"analyze-isax", "mlir::ModuleOp"> {
   let summary = "Analyze CoreDSL ISAX MLIR and output structured YAML";
   let description = [{
