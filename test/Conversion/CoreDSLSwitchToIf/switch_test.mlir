@@ -3,9 +3,7 @@
 coredsl.isax "SwitchStmt" {
 // CHECK: coredsl.isax "SwitchStmt"
   coredsl.register core_x @X[32] : ui32
-  coredsl.register local @PC : ui32
   coredsl.addrspace core_mem @MEM : (ui32) -> ui8
-  coredsl.register local const @MY_CONST = 3 : ui32
   coredsl.instruction @Simple {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_rs2_4_0", 4, 0, 0, "rs2"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("0000000", %TREENAIL_WAS_HERE_rs2_4_0 : ui5, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "001", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0101011") {
 
 // CHECK: %0 = hwarith.constant 1 : ui1
