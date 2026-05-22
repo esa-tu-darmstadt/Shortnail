@@ -90,8 +90,6 @@ struct CoreDSLSwitchToIf
   // multiple op types for the walk method
   template <typename OpType>
   struct RegionToSCFConverter {
-    // So we can use Pass::getChildAnalysis
-    friend struct CoreDSLSwitchToIf;
     CoreDSLSwitchToIf &pass;
     bool &changed;
 
