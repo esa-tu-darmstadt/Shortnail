@@ -236,5 +236,54 @@ coredsl.isax "SwitchStmt" {
     coredsl.set @MEM[2] = %8 : ui8
     coredsl.end
   }
+  coredsl.instruction @DefaultOnlySwitch {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_rs2_4_0", 4, 0, 0, "rs2"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("0000000", %TREENAIL_WAS_HERE_rs2_4_0 : ui5, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "001", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0101011") {
+
+// CHECK: %0 = hwarith.constant 5 : ui3
+// CHECK: %1 = hwarith.constant 10 : ui4
+// CHECK: %2 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
+// CHECK: %3 = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+// CHECK: %4 = coredsl.cast %3 : ui5 to ui32
+// CHECK: %5 = coredsl.get @MEM[%4 : ui32] : ui8
+// CHECK: %6 = coredsl.get @MEM[1:0] : ui16
+// CHECK: %7 = coredsl.get @MEM[2] : ui8
+// CHECK: %8 = coredsl.cast %2 : ui5 to ui32
+// CHECK: %9 = coredsl.get @MEM[%8 : ui32] : ui8
+// CHECK: %10 = coredsl.cast %9 : ui8 to ui32
+// CHECK: %11 = coredsl.cast %1 : ui4 to ui16
+// CHECK: %12 = coredsl.cast %0 : ui3 to ui8
+// CHECK: coredsl.set @X[%2 : ui5] = %10 : ui32
+// CHECK: coredsl.set @MEM[1:0] = %11 : ui16
+// CHECK: coredsl.set @MEM[2] = %12 : ui8
+
+    %rs2 = coredsl.cast %TREENAIL_WAS_HERE_rs2_4_0 : ui5 to ui5
+    %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
+    %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+    %1 = coredsl.cast %rd : ui5 to ui32
+    %0 = coredsl.get @MEM[%1 : ui32] : ui8
+    %2 = coredsl.cast %0 : ui8 to ui32
+    %3 = coredsl.get @MEM[1:0] : ui16
+    %4 = coredsl.get @MEM[2] : ui8
+    %5 = hwarith.cast %rs2 : (ui5) -> i6
+    %6, %7, %8 = scf.execute_region -> (ui32, ui16, ui8) {
+      cf.switch %5 : i6, [
+        default: ^default
+      ]
+      ^default():
+        %7 = coredsl.cast %rs1 : ui5 to ui32
+        %6 = coredsl.get @MEM[%7 : ui32] : ui8
+        %8 = coredsl.cast %6 : ui8 to ui32
+        %9 = hwarith.constant 10 : ui4
+        %10 = coredsl.cast %9 : ui4 to ui16
+        %11 = hwarith.constant 5 : ui3
+        %12 = coredsl.cast %11 : ui3 to ui8
+        cf.br ^switch_end(%8, %10, %12 : ui32, ui16, ui8)
+      ^switch_end(%13: ui32, %14: ui16, %15: ui8):
+        scf.yield %13, %14, %15 : ui32, ui16, ui8
+    }
+    coredsl.set @X[%rs1 : ui5] = %6 : ui32
+    coredsl.set @MEM[1:0] = %7 : ui16
+    coredsl.set @MEM[2] = %8 : ui8
+    coredsl.end
+  }
 }
 
