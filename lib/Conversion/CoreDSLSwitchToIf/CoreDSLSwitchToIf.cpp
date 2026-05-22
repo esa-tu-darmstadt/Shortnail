@@ -117,29 +117,24 @@ struct CoreDSLSwitchToIf
     // NOTE: Treenail currently always generates an scf.execute_region operation
     // around every cf.switch. Because of this, it is technically only necessary
     // to run this on scf::ExecuteRegionOp and func::FuncOp
-    auto res = isaxOp->walk<ORDER>(
-        RegionToSCFConverter<coredsl::InstructionOp>{*this, changed});
-    if (res == WalkResult::interrupt()) {
-      return signalPassFailure();
-    }
-    res = isaxOp->walk<ORDER>(
-        RegionToSCFConverter<coredsl::AlwaysOp>{*this, changed});
-    if (res == WalkResult::interrupt()) {
-      return signalPassFailure();
-    }
-    res = isaxOp->walk<ORDER>(
-        RegionToSCFConverter<coredsl::SpawnOp>{*this, changed});
-    if (res == WalkResult::interrupt()) {
-      return signalPassFailure();
-    }
-    res =
-        isaxOp->walk<ORDER>(RegionToSCFConverter<func::FuncOp>{*this, changed});
-    if (res == WalkResult::interrupt()) {
-      return signalPassFailure();
-    }
-    res = isaxOp->walk<ORDER>(
-        RegionToSCFConverter<scf::ExecuteRegionOp>{*this, changed});
-    if (res == WalkResult::interrupt()) {
+    if (isaxOp
+            ->walk<ORDER>(
+                RegionToSCFConverter<coredsl::InstructionOp>{*this, changed})
+            .wasInterrupted() ||
+        isaxOp
+            ->walk<ORDER>(
+                RegionToSCFConverter<coredsl::AlwaysOp>{*this, changed})
+            .wasInterrupted() ||
+        isaxOp
+            ->walk<ORDER>(
+                RegionToSCFConverter<coredsl::SpawnOp>{*this, changed})
+            .wasInterrupted() ||
+        isaxOp->walk<ORDER>(RegionToSCFConverter<func::FuncOp>{*this, changed})
+            .wasInterrupted() ||
+        isaxOp
+            ->walk<ORDER>(
+                RegionToSCFConverter<scf::ExecuteRegionOp>{*this, changed})
+            .wasInterrupted()) {
       return signalPassFailure();
     }
     if (!changed) {
