@@ -17,7 +17,6 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"

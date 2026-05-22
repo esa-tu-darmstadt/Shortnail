@@ -55,7 +55,6 @@ def CoreDSLToPy : Pass<"coredsl-to-python", "::mlir::coredsl::ISAXOp"> {
   }];
   let dependentDialects = [
     "::mlir::coredsl::CoreDSLDialect",
-    "::mlir::ub::UBDialect",
     "::circt::hw::HWDialect",
     "::circt::hwarith::HWArithDialect",
   ];
@@ -71,8 +70,6 @@ def CoreDSLSwitchToIf : Pass<"coredsl-switch-to-if", "::mlir::coredsl::ISAXOp"> 
 
   let dependentDialects = [
     "::mlir::coredsl::CoreDSLDialect",
-    // Necessary because removeDeadValues pass creates ub.poison
-    "::mlir::ub::UBDialect",
   ];
 }
 

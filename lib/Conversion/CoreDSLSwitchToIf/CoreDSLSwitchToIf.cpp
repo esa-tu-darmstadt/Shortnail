@@ -10,7 +10,6 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/UB/IR/UBOps.h"
 
 namespace mlir {
 namespace shortnail {
@@ -163,14 +162,22 @@ struct CoreDSLSwitchToIf
     if (failed(applyFullConversion(isaxOp, target, std::move(patterns)))) {
       return signalPassFailure();
     }
-    // Run a dead value removal pass, as the index casts are now dead
-    // NOTE: workaround to prevent crashes when deleting the index cast in
-    // IndexSwitchToSCFIf::run
-    OpPassManager finalPass{isaxOp.getOperationName()};
-    finalPass.addPass(createRemoveDeadValuesPass());
-    if (failed(runPipeline(finalPass, isaxOp))) {
-      return signalPassFailure();
-    }
+    // After converting the scf::IndexSwitchOps, the arith::IndexCastOp and
+    // hwarith::CastOps do not have uses anymore. Deleting the
+    // arith::IndexCastOps is especially important, because longnail does not
+    // know how to deal with them
+    // First delete the IndexCastOps, then the hwarith::CastOps, because the
+    // IndexCastOp is their only use
+    isaxOp->walk([](arith::IndexCastOp op){
+      if (op->use_empty()) {
+        op->erase();
+      }
+    });
+    isaxOp->walk([](hwarith::CastOp op){
+      if (op->use_empty()) {
+        op->erase();
+      }
+    });
   }
 };
 } // anonymous namespace
