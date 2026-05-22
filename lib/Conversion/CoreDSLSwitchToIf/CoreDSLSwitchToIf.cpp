@@ -153,11 +153,6 @@ struct CoreDSLSwitchToIf
       return;
     }
     MLIRContext &ctx = getContext();
-    // First convert the cf operations
-    OpPassManager cfToSCFPM{isaxOp.getOperationName()};
-    if (failed(runPipeline(cfToSCFPM, isaxOp))) {
-      return signalPassFailure();
-    }
     RewritePatternSet patterns{&ctx};
     ConversionTarget target{ctx};
     target.addLegalDialect<coredsl::CoreDSLDialect, arith::ArithDialect,
