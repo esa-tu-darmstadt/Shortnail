@@ -93,6 +93,9 @@ def CoreDSL_Dialect : Dialect {
       "arith::ArithDialect",
       "hwarith::HWArithDialect",
       "func::FuncDialect",
+      // Needed because treenail emits comb.sub and comb.add for operations on
+      // signless integers, such as in the scf.for codegen
+      "comb::CombDialect",
     ];
     let cppNamespace = "::mlir::coredsl";
 }
