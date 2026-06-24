@@ -491,7 +491,7 @@ Examples:
 
 | Result | Description |
 | :----: | ----------- |
-| `result` | an arbitrary precision integer with signedness semantics |
+| `result` | any type |
 
 
 
@@ -728,7 +728,7 @@ coredsl.set @MEM[%addr : ui32, 0:3] = %3 : ui32 // big-endian
 | Operand | Description |
 | :-----: | ----------- |
 | `base` | an arbitrary precision integer with signedness semantics and unsigned integer |
-| `value` | an arbitrary precision integer with signedness semantics |
+| `value` | any type |
 
 
 
