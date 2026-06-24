@@ -12,6 +12,7 @@
 
 #include "circt/Dialect/HWArith/HWArithOps.h"
 #include "circt/Dialect/HWArith/HWArithTypes.h"
+#include "circt/Dialect/HW/HWOps.h"
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -384,8 +385,8 @@ unsigned AddressSpaceOp::getMinIndexWidth() {
   // TODO restrict to the address width?
   // return getAddrType()->getIntOrFloatBitWidth();
 }
-IntegerType AddressSpaceOp::getElementType() {
-  return cast<IntegerType>(getResType());
+Type AddressSpaceOp::getElementType() {
+  return getResType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -425,8 +426,8 @@ unsigned RegisterOp::getMaxIndexWidth() {
   return llvm::Log2_64_Ceil(getSize());
 }
 unsigned RegisterOp::getMinIndexWidth() { return 0; }
-IntegerType RegisterOp::getElementType() {
-  return cast<IntegerType>(getRegType());
+Type RegisterOp::getElementType() {
+  return getRegType();
 }
 
 LogicalResult RegisterOp::verify() {
@@ -435,7 +436,7 @@ LogicalResult RegisterOp::verify() {
     return emitError("register fields of size 0 are invalid");
   }
 
-  if (!isHWArithIntegerType(getRegType())) {
+  if (isa<IntegerType>(getRegType()) && !isHWArithIntegerType(getRegType())) {
     return emitError("register type must be an arbitrary precision integer "
                      "with signedness semantics");
   }
@@ -703,11 +704,18 @@ LogicalResult ConcatOp::inferReturnTypes(
 template <typename AccessOpTy>
 static LogicalResult checkAccess(AccessOpTy op, Type requiredType) {
   if (auto info = op.getMemInfo()) {
+    Type expectedType;
+    if (auto intType = dyn_cast<IntegerType>(info->elementType)) {
+      expectedType = IntegerType::get(op.getContext(), intType.getWidth() * op.getAccessWidth(), intType.getSignedness());
+    } else if (auto structType = dyn_cast<circt::hw::StructType>(info->elementType)) {
+      // TODO: Are accesses with access width > 1 supported by CoreDSL?
+      assert(op.getAccessWidth() == 1 && "Access with may only be 1 for struct types");
+      expectedType = structType;
+    } else {
+      llvm_unreachable("Unexpected type");
+    }
     // Calculate the expected type: element type width * access width while
     // keeping the signedness
-    Type expectedType = IntegerType::get(
-        op.getContext(), info->elementType.getWidth() * op.getAccessWidth(),
-        info->elementType.getSignedness());
     if (expectedType != requiredType) {
       return op.emitError("type mismatch, referencing storage of type ")
              << info->elementType << " with access width of "
