@@ -1,8 +1,20 @@
 // RUN: shortnail-opt %s -coredsl-explode-struct-registers -canonicalize | shortnail-opt | FileCheck %s
 
+// TODO: add test with triple nested struct
 coredsl.isax "StructRegisters" {
   coredsl.register local @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
   coredsl.register local @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+  coredsl.register local @TRIPLE_NESTED_REG : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+// CHECK: coredsl.register local @STRUCT_REG_x  : ui32
+// CHECK: coredsl.register local @STRUCT_REG_y  : ui32
+// CHECK: coredsl.register local @NESTED_STRUCT_REG_notNested  : si32
+// CHECK: coredsl.register local @NESTED_STRUCT_REG_vec_x  : ui32
+// CHECK: coredsl.register local @NESTED_STRUCT_REG_vec_y  : ui32
+// CHECK: coredsl.register local @TRIPLE_NESTED_REG_internalStruct_notNested  : si32
+// CHECK: coredsl.register local @TRIPLE_NESTED_REG_internalStruct_vec_x  : ui32
+// CHECK: coredsl.register local @TRIPLE_NESTED_REG_internalStruct_vec_y  : ui32
+// CHECK: coredsl.register local @TRIPLE_NESTED_REG_intVal  : ui32
+
   coredsl.instruction @StructRegDirectStore {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
 // CHECK: %0 = hwarith.constant 0 : ui1
 // CHECK: %1 = hwarith.constant 255 : ui8
