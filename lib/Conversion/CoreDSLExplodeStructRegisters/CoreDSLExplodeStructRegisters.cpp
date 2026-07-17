@@ -18,25 +18,22 @@ using namespace circt;
 
 namespace {
 
-// IDEA: make pattern be applied recursively?!?!
-// - Would generate more registers that are later deleted
-// - may be easier
-
-// TODO: not sure if twine makes sense here, because we are appending here
-template <typename ScalarValueAction, typename StructMemberAction>
+template <typename ScalarValueAction, typename StructMemberEntryAction, typename StructMemberExitAction>
 void explodeRegs(StringRef regName, hw::StructType type,
                  ConversionPatternRewriter &rewriter,
                  ScalarValueAction scalarValueAction,
-                 StructMemberAction structMemberAction) {
+                 StructMemberEntryAction structMemberEntryAction,
+                 StructMemberExitAction structMemberExitAction) {
   for (hw::StructType::FieldInfo fieldInfo : type.getElements()) {
     //auto newRegName = regName + "_" + fieldInfo.name.getValue();
     auto newRegName = std::string(regName);
     newRegName += "_";
     newRegName += fieldInfo.name.getValue();
     if (auto structType = llvm::dyn_cast<hw::StructType>(fieldInfo.type)) {
-      structMemberAction(structType, fieldInfo.name);
+      structMemberEntryAction(structType, fieldInfo.name);
       explodeRegs(newRegName, structType, rewriter, scalarValueAction,
-                  structMemberAction);
+                  structMemberEntryAction, structMemberExitAction);
+      structMemberExitAction(structType, fieldInfo.name);
     } else {
       scalarValueAction(newRegName, fieldInfo.name,
                         llvm::cast<IntegerType>(fieldInfo.type));
@@ -45,12 +42,8 @@ void explodeRegs(StringRef regName, hw::StructType type,
 }
 
 struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
-  // TODO: may not be necessary
-  llvm::StringMap<coredsl::RegisterOp> &nameToRegMap;
-  StructExploderPattern(MLIRContext *ctx,
-                        llvm::StringMap<coredsl::RegisterOp> &nameToRegMap)
-      : OpConversionPattern<coredsl::RegisterOp>(ctx),
-        nameToRegMap{nameToRegMap} {}
+  StructExploderPattern(MLIRContext *ctx)
+      : OpConversionPattern<coredsl::RegisterOp>(ctx) {}
 
   LogicalResult
   matchAndRewrite(coredsl::RegisterOp op, OpAdaptor,
@@ -59,10 +52,9 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
       StringRef name = op.getName();
       rewriter.setInsertionPointAfter(op);
       Location loc = op.getLoc();
-      nameToRegMap.insert(std::make_pair(name, op));
       explodeRegs(
           name, structType, rewriter,
-          [this, &rewriter, &loc, &op](StringRef newRegName, StringAttr fieldName,
+          [&rewriter, &loc, &op](StringRef newRegName, StringAttr fieldName,
                                   IntegerType fieldType) {
             auto ctx = rewriter.getContext();
             StringAttr symbolName = StringAttr::get(ctx, newRegName);
@@ -71,9 +63,8 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
                 /*numElements=*/nullptr, {},
                 fieldType,
                 op.getAccessMode());
-
-            nameToRegMap.insert(std::make_pair(newRegName, reg));
           },
+          [](hw::StructType, StringAttr) {},
           [](hw::StructType, StringAttr) {});
       // TODO: not sure if this will work, as the reg is still used
       rewriter.eraseOp(op);
@@ -84,11 +75,8 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
 };
 
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
-  const llvm::StringMap<coredsl::RegisterOp> &nameToRegMap;
-
-  StructRewriteSetOps(MLIRContext *ctx,
-                      const llvm::StringMap<coredsl::RegisterOp> &nameToRegMap)
-      : OpConversionPattern<coredsl::SetOp>(ctx), nameToRegMap{nameToRegMap} {}
+  StructRewriteSetOps(MLIRContext *ctx)
+      : OpConversionPattern<coredsl::SetOp>(ctx) {}
 
   LogicalResult
   matchAndRewrite(coredsl::SetOp op, OpAdaptor,
@@ -103,11 +91,9 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
           [&rewriter, &opStack, &loc](StringRef newRegName,
                                       StringAttr fieldName, IntegerType type) {
             auto writtenValue = opStack.back();
-            auto op = coredsl::SetOp::create(rewriter, loc, nullptr, nullptr, nullptr,
-                                   newRegName, writtenValue->getResult(0));
-            llvm::outs() << "New op: " << op << "\n";
-            // TODO: this is writing struct inject
-            llvm::outs() << "Set val: " << *writtenValue << "\n";
+            auto extractOp = hw::StructExtractOp::create(rewriter, loc, writtenValue->getResult(0), fieldName);
+            coredsl::SetOp::create(rewriter, loc, nullptr, nullptr, nullptr,
+                                   newRegName, extractOp->getResult(0));
           },
           [&rewriter, &opStack, &loc](hw::StructType type,
                                       StringAttr fieldName) {
@@ -119,7 +105,8 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
             auto extractOp = hw::StructExtractOp::create(
                 rewriter, loc, toExtractFrom->getResult(0), fieldName);
             opStack.push_back(extractOp);
-          });
+          },
+          [](hw::StructType, StringAttr) {});
       rewriter.eraseOp(op);
       return LogicalResult::success();
     }
@@ -128,11 +115,8 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
 };
 
 struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
-  const llvm::StringMap<coredsl::RegisterOp> &nameToRegMap;
-
-  StructRewriteGetOps(MLIRContext *ctx,
-                      const llvm::StringMap<coredsl::RegisterOp> &nameToRegMap)
-      : OpConversionPattern<coredsl::GetOp>(ctx), nameToRegMap{nameToRegMap} {}
+  StructRewriteGetOps(MLIRContext *ctx)
+      : OpConversionPattern<coredsl::GetOp>(ctx) {}
 
   LogicalResult
   matchAndRewrite(coredsl::GetOp op, OpAdaptor,
@@ -140,10 +124,10 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
     auto type = op.getResult().getType();
     if (auto structType = llvm::dyn_cast<hw::StructType>(type)) {
       StringRef symbolName = op.getSym();
-      coredsl::RegisterOp accessedReg = nameToRegMap.find(symbolName)->second;
 
       auto loc = op.getLoc();
       SmallVector<Value> structMembers;
+      size_t structBeginIdx = 0;
       // TODO: need to combine the gotten vavlues into a struct
       explodeRegs(
           symbolName, structType, rewriter,
@@ -151,14 +135,19 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
             auto gotValue = coredsl::GetOp::create(rewriter, loc, type, nullptr, nullptr, nullptr, newRegName);
             structMembers.push_back(gotValue.getResult());
           },
-          [&rewriter, &loc, &structMembers](hw::StructType type, StringAttr fieldName) {
+          [&structBeginIdx, &structMembers](hw::StructType, StringAttr) {
+            structBeginIdx = structMembers.size();
+          },
+          [&rewriter, &loc, &structBeginIdx, &structMembers](hw::StructType type, StringAttr fieldName) {
             // TODO: hope this does not scramble struct members
-            auto structVal = hw::StructCreateOp::create(rewriter, loc, type, structMembers);
-            structMembers.clear();
+            auto currStructMembers = ArrayRef(structMembers.begin() + structBeginIdx, structMembers.end());
+            auto structVal = hw::StructCreateOp::create(rewriter, loc, type, currStructMembers);
+            structMembers.resize(structBeginIdx);
             structMembers.push_back(structVal.getResult());
           });
       // TODO: hope this does not scramble struct members
-      auto finalStruct = hw::StructCreateOp::create(rewriter, loc, accessedReg.getElementType(), structMembers);
+      // TODO: this crashes :(
+      auto finalStruct = hw::StructCreateOp::create(rewriter, loc, type, structMembers);
       rewriter.replaceOp(op, finalStruct.getResult());
       return LogicalResult::success();
     }
@@ -176,7 +165,8 @@ struct CoreDSLExplodeStructRegisters
     auto &ctx = getContext();
     RewritePatternSet patterns{&ctx};
     llvm::StringMap<coredsl::RegisterOp> nameToRegMap;
-    patterns.insert<StructExploderPattern>(&ctx, nameToRegMap);
+    llvm::StringMap<Type> nameToTypeMap;
+    patterns.insert<StructExploderPattern>(&ctx);
     ConversionTarget target{ctx};
     target.addLegalDialect<hw::HWDialect, coredsl::CoreDSLDialect>();
     target.addDynamicallyLegalOp<coredsl::RegisterOp>([](coredsl::RegisterOp op){
@@ -192,8 +182,8 @@ struct CoreDSLExplodeStructRegisters
     target.addDynamicallyLegalOp<coredsl::SetOp>([](coredsl::SetOp op){
       return op.getValue().getType().isInteger();
     });
-    patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(&ctx,
-                                                              nameToRegMap);
+    patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(&ctx);
+
     if (failed(applyPartialConversion(isax, target, std::move(patterns)))) {
       return signalPassFailure();
     }
