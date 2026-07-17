@@ -18,14 +18,15 @@ using namespace circt;
 
 namespace {
 
-template <typename ScalarValueAction, typename StructMemberEntryAction, typename StructMemberExitAction>
+template <typename ScalarValueAction, typename StructMemberEntryAction,
+          typename StructMemberExitAction>
 void explodeRegs(StringRef regName, hw::StructType type,
                  ConversionPatternRewriter &rewriter,
                  ScalarValueAction scalarValueAction,
                  StructMemberEntryAction structMemberEntryAction,
                  StructMemberExitAction structMemberExitAction) {
   for (hw::StructType::FieldInfo fieldInfo : type.getElements()) {
-    //auto newRegName = regName + "_" + fieldInfo.name.getValue();
+    // auto newRegName = regName + "_" + fieldInfo.name.getValue();
     auto newRegName = std::string(regName);
     newRegName += "_";
     newRegName += fieldInfo.name.getValue();
@@ -55,17 +56,15 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
       explodeRegs(
           name, structType, rewriter,
           [&rewriter, &loc, &op](StringRef newRegName, StringAttr fieldName,
-                                  IntegerType fieldType) {
+                                 IntegerType fieldType) {
             auto ctx = rewriter.getContext();
             StringAttr symbolName = StringAttr::get(ctx, newRegName);
-            auto reg = coredsl::RegisterOp::create(
-                rewriter, loc, {}, symbolName, op.getIsConst(), op.getIsVolatile(),
-                /*numElements=*/nullptr, {},
-                fieldType,
-                op.getAccessMode());
+            coredsl::RegisterOp::create(rewriter, loc, {}, symbolName,
+                                        op.getIsConst(), op.getIsVolatile(),
+                                        /*numElements=*/nullptr, {}, fieldType,
+                                        op.getAccessMode());
           },
-          [](hw::StructType, StringAttr) {},
-          [](hw::StructType, StringAttr) {});
+          [](hw::StructType, StringAttr) {}, [](hw::StructType, StringAttr) {});
       // TODO: not sure if this will work, as the reg is still used
       rewriter.eraseOp(op);
       return LogicalResult::success();
@@ -91,7 +90,8 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
           [&rewriter, &opStack, &loc](StringRef newRegName,
                                       StringAttr fieldName, IntegerType type) {
             auto writtenValue = opStack.back();
-            auto extractOp = hw::StructExtractOp::create(rewriter, loc, writtenValue->getResult(0), fieldName);
+            auto extractOp = hw::StructExtractOp::create(
+                rewriter, loc, writtenValue->getResult(0), fieldName);
             coredsl::SetOp::create(rewriter, loc, nullptr, nullptr, nullptr,
                                    newRegName, extractOp->getResult(0));
           },
@@ -131,23 +131,29 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
       // TODO: need to combine the gotten vavlues into a struct
       explodeRegs(
           symbolName, structType, rewriter,
-          [&rewriter, &loc, &structMembers](StringRef newRegName, StringAttr fieldName, IntegerType type) {
-            auto gotValue = coredsl::GetOp::create(rewriter, loc, type, nullptr, nullptr, nullptr, newRegName);
+          [&rewriter, &loc, &structMembers](
+              StringRef newRegName, StringAttr fieldName, IntegerType type) {
+            auto gotValue = coredsl::GetOp::create(
+                rewriter, loc, type, nullptr, nullptr, nullptr, newRegName);
             structMembers.push_back(gotValue.getResult());
           },
           [&structBeginIdx, &structMembers](hw::StructType, StringAttr) {
             structBeginIdx = structMembers.size();
           },
-          [&rewriter, &loc, &structBeginIdx, &structMembers](hw::StructType type, StringAttr fieldName) {
+          [&rewriter, &loc, &structBeginIdx,
+           &structMembers](hw::StructType type, StringAttr fieldName) {
             // TODO: hope this does not scramble struct members
-            auto currStructMembers = ArrayRef(structMembers.begin() + structBeginIdx, structMembers.end());
-            auto structVal = hw::StructCreateOp::create(rewriter, loc, type, currStructMembers);
+            auto currStructMembers = ArrayRef(
+                structMembers.begin() + structBeginIdx, structMembers.end());
+            auto structVal = hw::StructCreateOp::create(rewriter, loc, type,
+                                                        currStructMembers);
             structMembers.resize(structBeginIdx);
             structMembers.push_back(structVal.getResult());
           });
       // TODO: hope this does not scramble struct members
       // TODO: this crashes :(
-      auto finalStruct = hw::StructCreateOp::create(rewriter, loc, type, structMembers);
+      auto finalStruct =
+          hw::StructCreateOp::create(rewriter, loc, type, structMembers);
       rewriter.replaceOp(op, finalStruct.getResult());
       return LogicalResult::success();
     }
@@ -169,19 +175,16 @@ struct CoreDSLExplodeStructRegisters
     patterns.insert<StructExploderPattern>(&ctx);
     ConversionTarget target{ctx};
     target.addLegalDialect<hw::HWDialect, coredsl::CoreDSLDialect>();
-    target.addDynamicallyLegalOp<coredsl::RegisterOp>([](coredsl::RegisterOp op){
-      return op.getElementType().isInteger();
-    });
+    target.addDynamicallyLegalOp<coredsl::RegisterOp>(
+        [](coredsl::RegisterOp op) { return op.getElementType().isInteger(); });
     if (failed(applyPartialConversion(isax, target, std::move(patterns)))) {
       return signalPassFailure();
     }
     patterns.clear();
-    target.addDynamicallyLegalOp<coredsl::GetOp>([](coredsl::GetOp op){
-      return op.getResult().getType().isInteger();
-    });
-    target.addDynamicallyLegalOp<coredsl::SetOp>([](coredsl::SetOp op){
-      return op.getValue().getType().isInteger();
-    });
+    target.addDynamicallyLegalOp<coredsl::GetOp>(
+        [](coredsl::GetOp op) { return op.getResult().getType().isInteger(); });
+    target.addDynamicallyLegalOp<coredsl::SetOp>(
+        [](coredsl::SetOp op) { return op.getValue().getType().isInteger(); });
     patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(&ctx);
 
     if (failed(applyPartialConversion(isax, target, std::move(patterns)))) {
