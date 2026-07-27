@@ -90,13 +90,13 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
       SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
       explodeRegs(
           symbolName, structType, rewriter,
-          [&rewriter, &opStack, &loc, &base, &from, &to](StringRef newRegName,
-                                      StringAttr fieldName, IntegerType type) {
+          [&rewriter, &opStack, &loc, &base, &from,
+           &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
             auto writtenValue = opStack.back();
             auto extractOp = hw::StructExtractOp::create(
                 rewriter, loc, writtenValue->getResult(0), fieldName);
-            coredsl::SetOp::create(rewriter, loc, base, from, to,
-                                   newRegName, extractOp->getResult(0));
+            coredsl::SetOp::create(rewriter, loc, base, from, to, newRegName,
+                                   extractOp->getResult(0));
           },
           [&rewriter, &opStack, &loc](hw::StructType type,
                                       StringAttr fieldName) {
@@ -134,10 +134,10 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
       SmallVector<size_t> structBeginIndices = {0};
       explodeRegs(
           symbolName, structType, rewriter,
-          [&rewriter, &loc, &structMembers, &base, &from, &to](
-              StringRef newRegName, StringAttr fieldName, IntegerType type) {
-            auto gotValue = coredsl::GetOp::create(
-                rewriter, loc, type, base, from, to, newRegName);
+          [&rewriter, &loc, &structMembers, &base, &from,
+           &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
+            auto gotValue = coredsl::GetOp::create(rewriter, loc, type, base,
+                                                   from, to, newRegName);
             structMembers.push_back(gotValue.getResult());
           },
           [&structBeginIndices, &structMembers](hw::StructType, StringAttr) {
