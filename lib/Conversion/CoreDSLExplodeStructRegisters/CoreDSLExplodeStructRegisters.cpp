@@ -49,18 +49,20 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
   matchAndRewrite(coredsl::RegisterOp op, OpAdaptor,
                   ConversionPatternRewriter &rewriter) const override {
     if (auto structType = llvm::dyn_cast<hw::StructType>(op.getRegType())) {
+      auto numElements = op.getNumElementsAttr();
       StringRef name = op.getName();
       rewriter.setInsertionPointAfter(op);
       Location loc = op.getLoc();
       explodeRegs(
           name, structType, rewriter,
-          [&rewriter, &loc, &op](StringRef newRegName, StringAttr fieldName,
-                                 IntegerType fieldType) {
+          [&rewriter, &loc, &op, &numElements](StringRef newRegName,
+                                               StringAttr fieldName,
+                                               IntegerType fieldType) {
             auto ctx = rewriter.getContext();
             StringAttr symbolName = StringAttr::get(ctx, newRegName);
             coredsl::RegisterOp::create(rewriter, loc, {}, symbolName,
                                         op.getIsConst(), op.getIsVolatile(),
-                                        /*numElements=*/nullptr, {}, fieldType,
+                                        numElements, {}, fieldType,
                                         op.getAccessMode());
           },
           [](hw::StructType, StringAttr) {}, [](hw::StructType, StringAttr) {});
