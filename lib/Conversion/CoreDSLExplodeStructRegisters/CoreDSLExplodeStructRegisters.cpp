@@ -81,18 +81,21 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
   matchAndRewrite(coredsl::SetOp op, OpAdaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto value = op.getValue();
+    auto base = op.getBase();
+    auto from = op.getFromAttr();
+    auto to = op.getToAttr();
     if (auto structType = llvm::dyn_cast<hw::StructType>(value.getType())) {
       StringRef symbolName = op.getSym();
       auto loc = op.getLoc();
       SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
       explodeRegs(
           symbolName, structType, rewriter,
-          [&rewriter, &opStack, &loc](StringRef newRegName,
+          [&rewriter, &opStack, &loc, &base, &from, &to](StringRef newRegName,
                                       StringAttr fieldName, IntegerType type) {
             auto writtenValue = opStack.back();
             auto extractOp = hw::StructExtractOp::create(
                 rewriter, loc, writtenValue->getResult(0), fieldName);
-            coredsl::SetOp::create(rewriter, loc, nullptr, nullptr, nullptr,
+            coredsl::SetOp::create(rewriter, loc, base, from, to,
                                    newRegName, extractOp->getResult(0));
           },
           [&rewriter, &opStack, &loc](hw::StructType type,
@@ -123,15 +126,18 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
     if (auto structType = llvm::dyn_cast<hw::StructType>(type)) {
       StringRef symbolName = op.getSym();
 
+      auto base = op.getBase();
+      auto from = op.getFromAttr();
+      auto to = op.getToAttr();
       auto loc = op.getLoc();
       SmallVector<Value> structMembers;
       SmallVector<size_t> structBeginIndices = {0};
       explodeRegs(
           symbolName, structType, rewriter,
-          [&rewriter, &loc, &structMembers](
+          [&rewriter, &loc, &structMembers, &base, &from, &to](
               StringRef newRegName, StringAttr fieldName, IntegerType type) {
             auto gotValue = coredsl::GetOp::create(
-                rewriter, loc, type, nullptr, nullptr, nullptr, newRegName);
+                rewriter, loc, type, base, from, to, newRegName);
             structMembers.push_back(gotValue.getResult());
           },
           [&structBeginIndices, &structMembers](hw::StructType, StringAttr) {
