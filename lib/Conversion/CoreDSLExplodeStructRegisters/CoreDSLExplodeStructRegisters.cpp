@@ -102,7 +102,7 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
                 rewriter, loc, toExtractFrom->getResult(0), fieldName);
             opStack.push_back(extractOp);
           },
-          [](hw::StructType, StringAttr) {});
+          [&opStack](hw::StructType, StringAttr) { opStack.pop_back(); });
       rewriter.eraseOp(op);
       return LogicalResult::success();
     }
@@ -123,7 +123,7 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
 
       auto loc = op.getLoc();
       SmallVector<Value> structMembers;
-      size_t structBeginIdx = 0;
+      SmallVector<size_t> structBeginIndices = {0};
       explodeRegs(
           symbolName, structType, rewriter,
           [&rewriter, &loc, &structMembers](
@@ -132,16 +132,18 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
                 rewriter, loc, type, nullptr, nullptr, nullptr, newRegName);
             structMembers.push_back(gotValue.getResult());
           },
-          [&structBeginIdx, &structMembers](hw::StructType, StringAttr) {
-            structBeginIdx = structMembers.size();
+          [&structBeginIndices, &structMembers](hw::StructType, StringAttr) {
+            structBeginIndices.push_back(structMembers.size());
           },
-          [&rewriter, &loc, &structBeginIdx,
+          [&rewriter, &loc, &structBeginIndices,
            &structMembers](hw::StructType type, StringAttr fieldName) {
+            const size_t structBeginIdx = structBeginIndices.back();
             auto currStructMembers = ArrayRef(
                 structMembers.begin() + structBeginIdx, structMembers.end());
             auto structVal = hw::StructCreateOp::create(rewriter, loc, type,
                                                         currStructMembers);
             structMembers.resize(structBeginIdx);
+            structBeginIndices.pop_back();
             structMembers.push_back(structVal.getResult());
           });
       auto finalStruct =
