@@ -26,7 +26,6 @@ void explodeRegs(StringRef regName, hw::StructType type,
                  StructMemberEntryAction structMemberEntryAction,
                  StructMemberExitAction structMemberExitAction) {
   for (hw::StructType::FieldInfo fieldInfo : type.getElements()) {
-    // auto newRegName = regName + "_" + fieldInfo.name.getValue();
     auto newRegName = std::string(regName);
     newRegName += "_";
     newRegName += fieldInfo.name.getValue();
@@ -65,7 +64,6 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
                                         op.getAccessMode());
           },
           [](hw::StructType, StringAttr) {}, [](hw::StructType, StringAttr) {});
-      // TODO: not sure if this will work, as the reg is still used
       rewriter.eraseOp(op);
       return LogicalResult::success();
     }
@@ -97,8 +95,6 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
           },
           [&rewriter, &opStack, &loc](hw::StructType type,
                                       StringAttr fieldName) {
-            // TODO: emit hw.struct_extract and push result on stack
-            // TODO: get extracted value
             auto toExtractFrom = opStack.back();
             Value structVal = toExtractFrom->getResult(0);
             assert(llvm::isa<hw::StructType>(structVal.getType()));
@@ -128,7 +124,6 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
       auto loc = op.getLoc();
       SmallVector<Value> structMembers;
       size_t structBeginIdx = 0;
-      // TODO: need to combine the gotten vavlues into a struct
       explodeRegs(
           symbolName, structType, rewriter,
           [&rewriter, &loc, &structMembers](
@@ -142,7 +137,6 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
           },
           [&rewriter, &loc, &structBeginIdx,
            &structMembers](hw::StructType type, StringAttr fieldName) {
-            // TODO: hope this does not scramble struct members
             auto currStructMembers = ArrayRef(
                 structMembers.begin() + structBeginIdx, structMembers.end());
             auto structVal = hw::StructCreateOp::create(rewriter, loc, type,
@@ -150,8 +144,6 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
             structMembers.resize(structBeginIdx);
             structMembers.push_back(structVal.getResult());
           });
-      // TODO: hope this does not scramble struct members
-      // TODO: this crashes :(
       auto finalStruct =
           hw::StructCreateOp::create(rewriter, loc, type, structMembers);
       rewriter.replaceOp(op, finalStruct.getResult());
