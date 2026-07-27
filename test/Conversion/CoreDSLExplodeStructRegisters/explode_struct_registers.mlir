@@ -5,6 +5,8 @@ coredsl.isax "StructRegisters" {
   coredsl.register local @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
   coredsl.register local @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
   coredsl.register local @TRIPLE_NESTED_REG : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+  coredsl.register local @SCALAR_REG1 : ui32
+  coredsl.register local @SCALAR_REG2 : ui32
 // CHECK: coredsl.register local @STRUCT_REG_x  : ui32
 // CHECK: coredsl.register local @STRUCT_REG_y  : ui32
 // CHECK: coredsl.register local @NESTED_STRUCT_REG_notNested  : si32
@@ -14,6 +16,8 @@ coredsl.isax "StructRegisters" {
 // CHECK: coredsl.register local @TRIPLE_NESTED_REG_internalStruct_vec_x  : ui32
 // CHECK: coredsl.register local @TRIPLE_NESTED_REG_internalStruct_vec_y  : ui32
 // CHECK: coredsl.register local @TRIPLE_NESTED_REG_intVal  : ui32
+// CHECK: coredsl.register local @SCALAR_REG1 : ui32
+// CHECK: coredsl.register local @SCALAR_REG2 : ui32
 
   coredsl.instruction @StructRegDirectStore {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
 // CHECK: %0 = hwarith.constant 0 : ui1
@@ -78,6 +82,24 @@ coredsl.isax "StructRegisters" {
     %27 = hw.struct_inject %23["y"], %26 : !hw.struct<x: ui32, y: ui32>
     %28 = hw.struct_inject %22["vec"], %27 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
     coredsl.set @NESTED_STRUCT_REG = %28 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    coredsl.end
+  }
+  coredsl.instruction @TransferStructToScalarReg{lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
+// CHECK: %0 = hwarith.constant 1 : ui1
+// CHECK: %1 = coredsl.get @STRUCT_REG_x : ui32
+// CHECK: %2 = coredsl.get @STRUCT_REG_y : ui32
+// CHECK: %3 = hwarith.add %1, %0 : (ui32, ui1) -> ui33
+// CHECK: %4 = coredsl.cast %3 : ui33 to ui32
+// CHECK: coredsl.set @SCALAR_REG1 = %4 : ui32
+// CHECK: coredsl.set @SCALAR_REG2 = %2 : ui32
+    %0 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %1 = hw.struct_extract %0["x"] : !hw.struct<x: ui32, y: ui32>
+    %2 = hw.struct_extract %0["y"] : !hw.struct<x: ui32, y: ui32>
+    %3 = hwarith.constant 1 : ui1
+    %4 = hwarith.add %1, %3 : (ui32, ui1) -> ui33
+    %5 = coredsl.cast %4 : ui33 to ui32
+    coredsl.set @SCALAR_REG1 = %5 : ui32
+    coredsl.set @SCALAR_REG2 = %2 : ui32
     coredsl.end
   }
 }
