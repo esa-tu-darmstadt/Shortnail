@@ -20,37 +20,46 @@ coredsl.isax "StructRegisters" {
 // CHECK: coredsl.register local @SCALAR_REG2 : ui32
 
   coredsl.instruction @StructRegDirectStore {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
-// CHECK: %0 = hwarith.constant 0 : ui1
-// CHECK: %1 = hwarith.constant 255 : ui8
-// CHECK: %2 = hwarith.constant 7 : ui3
-// CHECK: %3 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
-// CHECK: %4 = coredsl.get @STRUCT_REG_x : ui32
-// CHECK: %5 = coredsl.get @STRUCT_REG_y : ui32
-// CHECK: %6 = coredsl.cast %3 : ui5 to ui32
-// CHECK: coredsl.set @STRUCT_REG_x = %6 : ui32
-// CHECK: coredsl.set @STRUCT_REG_y = %5 : ui32
-// CHECK: %7 = coredsl.get @STRUCT_REG_x : ui32
-// CHECK: %8 = coredsl.get @STRUCT_REG_y : ui32
-// CHECK: %9 = coredsl.get @NESTED_STRUCT_REG_notNested : si32
-// CHECK: %10 = coredsl.get @NESTED_STRUCT_REG_vec_x : ui32
-// CHECK: %11 = coredsl.get @NESTED_STRUCT_REG_vec_y : ui32
-// CHECK: %12 = coredsl.cast %2 : ui3 to ui32
-// CHECK: coredsl.set @NESTED_STRUCT_REG_notNested = %9 : si32
-// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_x = %12 : ui32
-// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_y = %11 : ui32
-// CHECK: %13 = coredsl.get @STRUCT_REG_x : ui32
-// CHECK: %14 = coredsl.get @STRUCT_REG_y : ui32
-// CHECK: %15 = coredsl.bitset %13[7:0] = %1 : (ui32, ui8) -> ui32
-// CHECK: coredsl.set @STRUCT_REG_x = %15 : ui32
-// CHECK: coredsl.set @STRUCT_REG_y = %14 : ui32
-// CHECK: %16 = coredsl.get @NESTED_STRUCT_REG_notNested : si32
-// CHECK: %17 = coredsl.get @NESTED_STRUCT_REG_vec_x : ui32
-// CHECK: %18 = coredsl.get @NESTED_STRUCT_REG_vec_y : ui32
-// CHECK: %19 = coredsl.cast %0 : ui1 to ui4
-// CHECK: %20 = coredsl.bitset %18[3:0] = %19 : (ui32, ui4) -> ui32
-// CHECK: coredsl.set @NESTED_STRUCT_REG_notNested = %16 : si32
-// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_x = %17 : ui32
-// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_y = %20 : ui32
+// CHECK: %0 = hwarith.constant -1 : si32
+// CHECK: %1 = hwarith.constant 0 : ui1
+// CHECK: %2 = hwarith.constant 255 : ui8
+// CHECK: %3 = hwarith.constant 7 : ui3
+// CHECK: %4 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
+// CHECK: %5 = coredsl.get @STRUCT_REG_x : ui32
+// CHECK: %6 = coredsl.get @STRUCT_REG_y : ui32
+// CHECK: %7 = coredsl.cast %4 : ui5 to ui32
+// CHECK: coredsl.set @STRUCT_REG_x = %7 : ui32
+// CHECK: coredsl.set @STRUCT_REG_y = %6 : ui32
+// CHECK: %8 = coredsl.get @STRUCT_REG_x : ui32
+// CHECK: %9 = coredsl.get @STRUCT_REG_y : ui32
+// CHECK: %10 = coredsl.get @NESTED_STRUCT_REG_notNested : si32
+// CHECK: %11 = coredsl.get @NESTED_STRUCT_REG_vec_x : ui32
+// CHECK: %12 = coredsl.get @NESTED_STRUCT_REG_vec_y : ui32
+// CHECK: %13 = coredsl.cast %3 : ui3 to ui32
+// CHECK: coredsl.set @NESTED_STRUCT_REG_notNested = %10 : si32
+// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_x = %13 : ui32
+// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_y = %12 : ui32
+// CHECK: %14 = coredsl.get @STRUCT_REG_x : ui32
+// CHECK: %15 = coredsl.get @STRUCT_REG_y : ui32
+// CHECK: %16 = coredsl.bitset %14[7:0] = %2 : (ui32, ui8) -> ui32
+// CHECK: coredsl.set @STRUCT_REG_x = %16 : ui32
+// CHECK: coredsl.set @STRUCT_REG_y = %15 : ui32
+// CHECK: %17 = coredsl.get @NESTED_STRUCT_REG_notNested : si32
+// CHECK: %18 = coredsl.get @NESTED_STRUCT_REG_vec_x : ui32
+// CHECK: %19 = coredsl.get @NESTED_STRUCT_REG_vec_y : ui32
+// CHECK: %20 = coredsl.cast %1 : ui1 to ui4
+// CHECK: %21 = coredsl.bitset %19[3:0] = %20 : (ui32, ui4) -> ui32
+// CHECK: coredsl.set @NESTED_STRUCT_REG_notNested = %17 : si32
+// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_x = %18 : ui32
+// CHECK: coredsl.set @NESTED_STRUCT_REG_vec_y = %21 : ui32
+// CHECK: %22 = coredsl.get @TRIPLE_NESTED_REG_internalStruct_notNested : si32
+// CHECK: %23 = coredsl.get @TRIPLE_NESTED_REG_internalStruct_vec_x : ui32
+// CHECK: %24 = coredsl.get @TRIPLE_NESTED_REG_internalStruct_vec_y : ui32
+// CHECK: %25 = coredsl.get @TRIPLE_NESTED_REG_intVal : ui32
+// CHECK: coredsl.set @TRIPLE_NESTED_REG_internalStruct_notNested = %0 : si32
+// CHECK: coredsl.set @TRIPLE_NESTED_REG_internalStruct_vec_x = %21 : ui32
+// CHECK: coredsl.set @TRIPLE_NESTED_REG_internalStruct_vec_y = %24 : ui32
+// CHECK: coredsl.set @TRIPLE_NESTED_REG_intVal = %25 : ui32
     %imm = coredsl.cast %TREENAIL_WAS_HERE_imm_11_0 : ui12 to ui12
     %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
     %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
@@ -82,6 +91,15 @@ coredsl.isax "StructRegisters" {
     %27 = hw.struct_inject %23["y"], %26 : !hw.struct<x: ui32, y: ui32>
     %28 = hw.struct_inject %22["vec"], %27 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
     coredsl.set @NESTED_STRUCT_REG = %28 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %29 = coredsl.get @TRIPLE_NESTED_REG : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+    %30 = hw.struct_extract %29["internalStruct"] : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+    %31 = hwarith.constant -1 : si32
+    %32 = hw.struct_inject %30["notNested"], %31 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %33 = hw.struct_extract %32["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %34 = hw.struct_inject %33["x"], %26 : !hw.struct<x: ui32, y: ui32>
+    %35 = hw.struct_inject %32["vec"], %34 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %36 = hw.struct_inject %29["internalStruct"], %35 : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+    coredsl.set @TRIPLE_NESTED_REG = %36 : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
     coredsl.end
   }
   coredsl.instruction @TransferStructToScalarReg{lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
