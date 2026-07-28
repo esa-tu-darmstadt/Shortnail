@@ -1,6 +1,5 @@
 // RUN: shortnail-opt %s -coredsl-explode-struct-registers -canonicalize | shortnail-opt | FileCheck %s
 
-// TODO: add test with triple nested struct
 coredsl.isax "StructRegisters" {
   coredsl.register local @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
   coredsl.register local @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
