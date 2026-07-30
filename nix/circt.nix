@@ -38,6 +38,7 @@ stdenv.mkDerivation rec {
 
   patches = [
     ./circt_ortools_required.patch
+    ./circt_ortools_objlib_defs.patch
     ./circt_export_verilog.patch
   ];
 

@@ -1,0 +1,18 @@
+diff --git a/lib/Scheduling/CMakeLists.txt b/lib/Scheduling/CMakeLists.txt
+--- a/lib/Scheduling/CMakeLists.txt
++++ b/lib/Scheduling/CMakeLists.txt
+@@ -33,3 +33,14 @@ add_circt_library(CIRCTScheduling
+   LINK_LIBS PUBLIC
+   ${SCHEDULING_LIBS}
+   )
++
++if(ortools_FOUND)
++  # llvm_add_library() splits this into obj.CIRCTScheduling plus the archive and
++  # attaches LINK_LIBS to the archive only; for the object library it forwards
++  # INCLUDE_DIRECTORIES but not COMPILE_DEFINITIONS (see the $<COMPILE_ONLY:>
++  # TODO in AddLLVM.cmake). OR-Tools >= 9.12 decorates its generated .pb.h with
++  # OR_PROTO_DLL, which no header defines -- it only ever arrives via
++  # ortools::ortools's INTERFACE_COMPILE_DEFINITIONS. Without this, compiling the
++  # object library fails with "incomplete type 'struct OR_PROTO_DLL'".
++  target_compile_definitions(obj.CIRCTScheduling PRIVATE $<TARGET_PROPERTY:ortools::ortools,INTERFACE_COMPILE_DEFINITIONS>)
++endif()

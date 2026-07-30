@@ -3,7 +3,7 @@ variables:
   GIT_SUBMODULE_STRATEGY: none
   NIX_CI_IMAGE: "$CI_REGISTRY/$CI_REGISTRY_USER/isax-tools-integration-env:latest"
   NIX_BUNDLE_IMAGE: "$CI_REGISTRY/$CI_REGISTRY_USER/isax-tools-integration-image-builder:latest"
-  OR_TOOLS_VER: "9.11"
+  OR_TOOLS_VER: "9.15"
 
 stages:
     - deps

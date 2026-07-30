@@ -1,5 +1,5 @@
 {
-  abseil-cpp_202407,
+  abseil-cpp_202508,
   bzip2,
   cbc,
   cmake,
@@ -13,7 +13,7 @@
   scipopt-scip,
   lib,
   pkg-config,
-  protobuf_29,
+  protobuf_32,
   re2,
   stdenv,
   swig,
@@ -25,22 +25,21 @@ let
   # OR-Tools strictly requires specific versions of abseil-cpp and
   # protobuf. Do not un-pin these, even if you're upgrading them to
   # what might happen to be the latest version at the current moment;
-  # future upgrades *will* break the build.
-  abseil-cpp = abseil-cpp_202407;
-  protobuf = protobuf_29.override { inherit abseil-cpp; };
+  # future upgrades *will* break the build. (9.15: abseil 20250814,
+  # protobuf v32 — mirrors the nixpkgs or-tools 9.15 recipe.)
+  abseil-cpp = abseil-cpp_202508;
+  protobuf = protobuf_32.override { inherit abseil-cpp; };
   patched_re2 = re2.override { inherit abseil-cpp; };
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "or-tools";
-  version = "9.12";
+  version = "9.15";
 
-  src = let
-    version = "9.12";
-  in fetchFromGitHub {
+  src = fetchFromGitHub {
     owner = "google";
     repo = "or-tools";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-5rFeAK51+BfjIyu/5f5ptaKMD7Hd20yHa2Vj3O3PkLU=";
+    hash = "sha256-9+tvgP/+/VY6wu7lzTdP4xfiJIgPSLVR9lEdZjQCZkE=";
   };
 
   cmakeFlags =
