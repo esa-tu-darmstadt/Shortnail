@@ -1,0 +1,46 @@
+Fix or-tools 9.15 Gurobi dynamic loading (google/or-tools#5079 + dlclose
+use-after-free). math_opt never triggers LoadGurobiDynamicLibrary (empty
+GRB* std::function globals -> bad_function_call), and DynamicLibrary's
+implicit copy + dlclose'ing destructor unloads libgurobi when the
+NoDestructor init lambda's return value is not elided (unoptimized
+builds) -> bound pointers dangle -> segfault. Applied with `patch -p1`
+inside the or-tools source tree.
+
+Upstream PR google/or-tools#5272 fixes the same two bugs on the way to
+Gurobi 13 support, but is written against a post-9.15 main: it spells the
+macros ABSL_RETURN_IF_ERROR/ABSL_ASSIGN_OR_RETURN, targets a refactored
+two-argument Gurobi::New, and deletes DynamicLibrary's move constructor
+that 9.15's gurobi_environment.cc needs (it initializes the library from
+a by-value lambda return). It therefore does not apply to 9.15. Drop this
+patch once that PR lands in a release we bump to.
+
+--- a/ortools/math_opt/solvers/gurobi/g_gurobi.cc	2026-07-31 18:48:29.849262445 +0200
++++ b/ortools/math_opt/solvers/gurobi/g_gurobi.cc	2026-07-31 18:48:29.862845769 +0200
+@@ -161,6 +161,10 @@
+ 
+ absl::StatusOr<GRBenvUniquePtr> GurobiNewPrimaryEnv(
+     const std::optional<GurobiIsvKey>& isv_key) {
++  // The GRB* function table is populated by the dynamic-library loader,
++  // which nothing on the MathOpt path invokes (google/or-tools#5079);
++  // without this call every GRB* std::function global is empty.
++  RETURN_IF_ERROR(LoadGurobiDynamicLibrary({}));
+   if (isv_key.has_value()) {
+     ASSIGN_OR_RETURN(GRBenv* const naked_primary_env,
+                      NewPrimaryEnvFromISVKey(*isv_key));
+--- a/ortools/third_party_solvers/dynamic_library.h	2026-07-31 18:48:29.848483922 +0200
++++ b/ortools/third_party_solvers/dynamic_library.h	2026-07-31 18:48:29.862714887 +0200
+@@ -33,6 +33,14 @@
+  public:
+   DynamicLibrary() : library_handle_(nullptr) {}
+ 
++  DynamicLibrary(const DynamicLibrary&) = delete;
++  DynamicLibrary& operator=(const DynamicLibrary&) = delete;
++  DynamicLibrary(DynamicLibrary&& other) noexcept
++      : library_handle_(other.library_handle_),
++        library_name_(std::move(other.library_name_)) {
++    other.library_handle_ = nullptr;
++  }
++
+   ~DynamicLibrary() {
+     if (library_handle_ == nullptr) {
+       return;

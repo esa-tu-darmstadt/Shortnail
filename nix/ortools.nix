@@ -42,6 +42,10 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-9+tvgP/+/VY6wu7lzTdP4xfiJIgPSLVR9lEdZjQCZkE=";
   };
 
+  # Shared with the script path (build_deps.sh injects it into
+  # circt/utils/get-or-tools.sh) so both builds get the same or-tools.
+  patches = [ ./ortools_gurobi_loader.patch ];
+
   cmakeFlags =
     [
       (lib.cmakeBool "BUILD_DEPS" false)
