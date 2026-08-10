@@ -11,7 +11,9 @@
 
 #include "circt/Dialect/Comb/CombDialect.h"
 #include "circt/Dialect/HW/HWDialect.h"
+#include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HWArith/HWArithDialect.h"
+#include "circt/Dialect/HWArith/HWArithOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -80,11 +82,44 @@ struct CoreDSLInlinerInterface : public DialectInlinerInterface {
 //===----------------------------------------------------------------------===//
 
 void CoreDSLDialect::initialize() {
+  auto dialect = getContext()->getLoadedDialect<func::FuncDialect>();
   addOperations<
 #define GET_OP_LIST
 #include "shortnail/Dialect/CoreDSL/CoreDSL.cpp.inc"
       >();
   addInterfaces<CoreDSLInlinerInterface>();
+}
+
+namespace {
+
+// This pattern is necessary because the canonicalizer will emit hw.constant ops
+// when invoked by the inliner. It does not check if an integer is actually of a
+// signless type, which causes the patterns invoked by the canonicalizer to fail
+// The error happens when the canonicalizer folds a hw.struct_extract op that
+// returns a non-signless integer type
+struct ConvertNonSignlessHWConstantToHWArith
+    : public OpRewritePattern<hw::ConstantOp> {
+  using OpRewritePattern<hw::ConstantOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(hw::ConstantOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = op.getResult().getType();
+    auto intType = cast<IntegerType>(type);
+    if (!intType.isSignless()) {
+      auto hwConst = hwarith::ConstantOp::create(rewriter, op.getLoc(), intType,
+                                                 op.getValueAttr());
+      rewriter.replaceOp(op, hwConst);
+      return success();
+    }
+    return failure();
+  }
+};
+
+} // namespace
+
+void CoreDSLDialect::getCanonicalizationPatterns(
+    RewritePatternSet &results) const {
+  results.add<ConvertNonSignlessHWConstantToHWArith>(getContext());
 }
 
 #include "shortnail/Dialect/CoreDSL/CoreDSLDialect.cpp.inc"
