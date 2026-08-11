@@ -82,7 +82,6 @@ struct CoreDSLInlinerInterface : public DialectInlinerInterface {
 //===----------------------------------------------------------------------===//
 
 void CoreDSLDialect::initialize() {
-  auto dialect = getContext()->getLoadedDialect<func::FuncDialect>();
   addOperations<
 #define GET_OP_LIST
 #include "shortnail/Dialect/CoreDSL/CoreDSL.cpp.inc"
