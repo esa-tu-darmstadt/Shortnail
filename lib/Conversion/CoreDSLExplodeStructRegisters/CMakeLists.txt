@@ -7,10 +7,8 @@ add_shortnail_library(ShortnailCoreDSLExplodeStructRegisters
     LINK_LIBS PUBLIC
     MLIRIR
     MLIRPass
-    MLIRSCFUtils
 
     CIRCTHW
-    CIRCTSupport
 
     ShortnailCoreDSL
 )
