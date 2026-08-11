@@ -10,9 +10,9 @@
 #include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLDirectives.h"
 
+#include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HWArith/HWArithOps.h"
 #include "circt/Dialect/HWArith/HWArithTypes.h"
-#include "circt/Dialect/HW/HWOps.h"
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -385,9 +385,7 @@ unsigned AddressSpaceOp::getMinIndexWidth() {
   // TODO restrict to the address width?
   // return getAddrType()->getIntOrFloatBitWidth();
 }
-Type AddressSpaceOp::getElementType() {
-  return getResType();
-}
+Type AddressSpaceOp::getElementType() { return getResType(); }
 
 //===----------------------------------------------------------------------===//
 // RegisterOp
@@ -426,9 +424,7 @@ unsigned RegisterOp::getMaxIndexWidth() {
   return llvm::Log2_64_Ceil(getSize());
 }
 unsigned RegisterOp::getMinIndexWidth() { return 0; }
-Type RegisterOp::getElementType() {
-  return getRegType();
-}
+Type RegisterOp::getElementType() { return getRegType(); }
 
 LogicalResult RegisterOp::verify() {
   // Regfield checks
@@ -706,10 +702,14 @@ static LogicalResult checkAccess(AccessOpTy op, Type requiredType) {
   if (auto info = op.getMemInfo()) {
     Type expectedType;
     if (auto intType = dyn_cast<IntegerType>(info->elementType)) {
-      expectedType = IntegerType::get(op.getContext(), intType.getWidth() * op.getAccessWidth(), intType.getSignedness());
-    } else if (auto structType = dyn_cast<circt::hw::StructType>(info->elementType)) {
+      expectedType = IntegerType::get(op.getContext(),
+                                      intType.getWidth() * op.getAccessWidth(),
+                                      intType.getSignedness());
+    } else if (auto structType =
+                   dyn_cast<circt::hw::StructType>(info->elementType)) {
       // TODO: Are accesses with access width > 1 supported by CoreDSL?
-      assert(op.getAccessWidth() == 1 && "Access with may only be 1 for struct types");
+      assert(op.getAccessWidth() == 1 &&
+             "Access with may only be 1 for struct types");
       expectedType = structType;
     } else {
       llvm_unreachable("Unexpected type");
