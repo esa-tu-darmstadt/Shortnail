@@ -172,8 +172,6 @@ struct CoreDSLExplodeStructRegisters
     coredsl::ISAXOp isax = getOperation();
     auto &ctx = getContext();
     RewritePatternSet patterns{&ctx};
-    llvm::StringMap<coredsl::RegisterOp> nameToRegMap;
-    llvm::StringMap<Type> nameToTypeMap;
     patterns.insert<StructExploderPattern>(&ctx);
     ConversionTarget target{ctx};
     target.addLegalDialect<hw::HWDialect, coredsl::CoreDSLDialect>();
