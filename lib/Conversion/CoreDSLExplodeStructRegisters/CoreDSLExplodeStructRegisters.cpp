@@ -42,8 +42,10 @@ void explodeRegs(StringRef regName, hw::StructType type,
 }
 
 struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
-  StructExploderPattern(MLIRContext *ctx)
-      : OpConversionPattern<coredsl::RegisterOp>(ctx) {}
+  llvm::StringMap<hw::StructType> &structTypes;
+
+  StructExploderPattern(MLIRContext *ctx, llvm::StringMap<hw::StructType> &structTypes)
+      : OpConversionPattern<coredsl::RegisterOp>(ctx), structTypes{structTypes} {}
 
   LogicalResult
   matchAndRewrite(coredsl::RegisterOp op, OpAdaptor,
@@ -66,6 +68,7 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
                                         op.getAccessMode());
           },
           [](hw::StructType, StringAttr) {}, [](hw::StructType, StringAttr) {});
+      structTypes.insert(std::make_pair(op.getSymName(), structType));
       rewriter.eraseOp(op);
       return LogicalResult::success();
     }
@@ -74,17 +77,21 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
 };
 
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
-  StructRewriteSetOps(MLIRContext *ctx)
-      : OpConversionPattern<coredsl::SetOp>(ctx) {}
+  const llvm::StringMap<hw::StructType> &structTypes;
+
+  StructRewriteSetOps(MLIRContext *ctx, llvm::StringMap<hw::StructType> &structTypes)
+      : OpConversionPattern<coredsl::SetOp>(ctx), structTypes{structTypes} {}
 
   LogicalResult
   matchAndRewrite(coredsl::SetOp op, OpAdaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto value = op.getValue();
     auto base = op.getBase();
     auto from = op.getFromAttr();
     auto to = op.getToAttr();
-    if (auto structType = llvm::dyn_cast<hw::StructType>(value.getType())) {
+    // Check if the symbol is one of the removed ones
+    auto found = structTypes.find(op.getSym());
+    if (found != structTypes.end()) {
+      auto structType = found->second;
       StringRef symbolName = op.getSym();
       auto loc = op.getLoc();
       SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
@@ -116,14 +123,19 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
 };
 
 struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
-  StructRewriteGetOps(MLIRContext *ctx)
-      : OpConversionPattern<coredsl::GetOp>(ctx) {}
+  const llvm::StringMap<hw::StructType> &structTypes;
+
+  StructRewriteGetOps(MLIRContext *ctx, llvm::StringMap<hw::StructType> &structTypes)
+      : OpConversionPattern<coredsl::GetOp>(ctx), structTypes{structTypes} {}
 
   LogicalResult
   matchAndRewrite(coredsl::GetOp op, OpAdaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto type = op.getResult().getType();
-    if (auto structType = llvm::dyn_cast<hw::StructType>(type)) {
+    // Check if sym is one of the exploded structs
+    auto found = structTypes.find(op.getSym());
+    if (found != structTypes.end()) {
+      auto structType = found->second;
       StringRef symbolName = op.getSym();
 
       auto base = op.getBase();
@@ -172,7 +184,8 @@ struct CoreDSLExplodeStructRegisters
     coredsl::ISAXOp isax = getOperation();
     auto &ctx = getContext();
     RewritePatternSet patterns{&ctx};
-    patterns.insert<StructExploderPattern>(&ctx);
+    llvm::StringMap<hw::StructType> nameToTypeMap;
+    patterns.insert<StructExploderPattern>(&ctx, nameToTypeMap);
     ConversionTarget target{ctx};
     target.addLegalDialect<hw::HWDialect, coredsl::CoreDSLDialect>();
     target.addDynamicallyLegalOp<coredsl::RegisterOp>(
@@ -185,7 +198,7 @@ struct CoreDSLExplodeStructRegisters
         [](coredsl::GetOp op) { return op.getResult().getType().isInteger(); });
     target.addDynamicallyLegalOp<coredsl::SetOp>(
         [](coredsl::SetOp op) { return op.getValue().getType().isInteger(); });
-    patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(&ctx);
+    patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(&ctx, nameToTypeMap);
 
     if (failed(applyPartialConversion(isax, target, std::move(patterns)))) {
       return signalPassFailure();
