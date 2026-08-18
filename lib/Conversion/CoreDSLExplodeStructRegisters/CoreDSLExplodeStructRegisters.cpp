@@ -2,8 +2,10 @@
 #include "shortnail/Conversion/Passes.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLOps.h"
 
+#include "circt/Dialect/Comb/CombOps.h"
 #include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HW/HWTypes.h"
+#include "circt/Dialect/HWArith/HWArithOps.h"
 
 namespace mlir {
 namespace shortnail {
@@ -42,10 +44,15 @@ void explodeRegs(StringRef regName, hw::StructType type,
 }
 
 struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
-  llvm::StringMap<hw::StructType> &structTypes;
+  llvm::StringMap<hw::StructType> &symNameToType;
+  llvm::StringMap<unsigned> &symNameToMaxIndexWidth;
 
-  StructExploderPattern(MLIRContext *ctx, llvm::StringMap<hw::StructType> &structTypes)
-      : OpConversionPattern<coredsl::RegisterOp>(ctx), structTypes{structTypes} {}
+  StructExploderPattern(MLIRContext *ctx,
+                        llvm::StringMap<hw::StructType> &structTypes,
+                        llvm::StringMap<unsigned> &symNameToMaxIndexWidth)
+      : OpConversionPattern<coredsl::RegisterOp>(ctx),
+        symNameToType{structTypes},
+        symNameToMaxIndexWidth{symNameToMaxIndexWidth} {}
 
   LogicalResult
   matchAndRewrite(coredsl::RegisterOp op, OpAdaptor,
@@ -68,7 +75,10 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
                                         op.getAccessMode());
           },
           [](hw::StructType, StringAttr) {}, [](hw::StructType, StringAttr) {});
-      structTypes.insert(std::make_pair(op.getSymName(), structType));
+      symNameToType.insert(std::make_pair(op.getSymName(), structType));
+      symNameToMaxIndexWidth.insert(
+          std::make_pair(op.getSymName(), op.getMaxIndexWidth()));
+      op.getMaxIndexWidth();
       rewriter.eraseOp(op);
       return LogicalResult::success();
     }
@@ -77,10 +87,14 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
 };
 
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
-  const llvm::StringMap<hw::StructType> &structTypes;
+  const llvm::StringMap<hw::StructType> &symNameToType;
+  const llvm::StringMap<unsigned> &symNameToMaxIndexWidth;
 
-  StructRewriteSetOps(MLIRContext *ctx, llvm::StringMap<hw::StructType> &structTypes)
-      : OpConversionPattern<coredsl::SetOp>(ctx), structTypes{structTypes} {}
+  StructRewriteSetOps(MLIRContext *ctx,
+                      llvm::StringMap<hw::StructType> &structTypes,
+                      llvm::StringMap<unsigned> &symNameToMaxIndexWidth)
+      : OpConversionPattern<coredsl::SetOp>(ctx), symNameToType{structTypes},
+        symNameToMaxIndexWidth{symNameToMaxIndexWidth} {}
 
   LogicalResult
   matchAndRewrite(coredsl::SetOp op, OpAdaptor,
@@ -89,8 +103,8 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
     auto from = op.getFromAttr();
     auto to = op.getToAttr();
     // Check if the symbol is one of the removed ones
-    auto found = structTypes.find(op.getSym());
-    if (found != structTypes.end()) {
+    auto found = symNameToType.find(op.getSym());
+    if (found != symNameToType.end()) {
       auto structType = found->second;
       StringRef symbolName = op.getSym();
       auto loc = op.getLoc();
@@ -123,18 +137,23 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
 };
 
 struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
-  const llvm::StringMap<hw::StructType> &structTypes;
+  const llvm::StringMap<hw::StructType> &symNameToType;
+  const llvm::StringMap<unsigned> &symNameToMaxIndexWidth;
 
-  StructRewriteGetOps(MLIRContext *ctx, llvm::StringMap<hw::StructType> &structTypes)
-      : OpConversionPattern<coredsl::GetOp>(ctx), structTypes{structTypes} {}
+  StructRewriteGetOps(MLIRContext *ctx,
+                      llvm::StringMap<hw::StructType> &structTypes,
+                      llvm::StringMap<unsigned> &symNameToMaxIndexWidth)
+      : OpConversionPattern<coredsl::GetOp>(ctx), symNameToType{structTypes},
+        symNameToMaxIndexWidth{symNameToMaxIndexWidth} {}
 
   LogicalResult
   matchAndRewrite(coredsl::GetOp op, OpAdaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    MLIRContext *ctx = getContext();
     auto type = op.getResult().getType();
     // Check if sym is one of the exploded structs
-    auto found = structTypes.find(op.getSym());
-    if (found != structTypes.end()) {
+    auto found = symNameToType.find(op.getSym());
+    if (found != symNameToType.end()) {
       auto structType = found->second;
       StringRef symbolName = op.getSym();
 
@@ -142,33 +161,83 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
       auto from = op.getFromAttr();
       auto to = op.getToAttr();
       auto loc = op.getLoc();
-      SmallVector<Value> structMembers;
-      SmallVector<size_t> structBeginIndices = {0};
-      explodeRegs(
-          symbolName, structType, rewriter,
-          [&rewriter, &loc, &structMembers, &base, &from,
-           &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
-            auto gotValue = coredsl::GetOp::create(rewriter, loc, type, base,
-                                                   from, to, newRegName);
-            structMembers.push_back(gotValue.getResult());
-          },
-          [&structBeginIndices, &structMembers](hw::StructType, StringAttr) {
-            structBeginIndices.push_back(structMembers.size());
-          },
-          [&rewriter, &loc, &structBeginIndices,
-           &structMembers](hw::StructType type, StringAttr fieldName) {
-            const size_t structBeginIdx = structBeginIndices.back();
-            auto currStructMembers = ArrayRef(
-                structMembers.begin() + structBeginIdx, structMembers.end());
-            auto structVal = hw::StructCreateOp::create(rewriter, loc, type,
-                                                        currStructMembers);
-            structMembers.resize(structBeginIdx);
-            structBeginIndices.pop_back();
-            structMembers.push_back(structVal.getResult());
-          });
-      auto finalStruct =
-          hw::StructCreateOp::create(rewriter, loc, type, structMembers);
-      rewriter.replaceOp(op, finalStruct.getResult());
+      Value replacement = nullptr;
+      if (to != nullptr) {
+        assert(from);
+        SmallVector<Value> toConcatenate;
+        const unsigned maxIndexWidth =
+            symNameToMaxIndexWidth.find(op.getSym())->second;
+        for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
+          APInt val{64, (uint64_t)i, true};
+          val = val.trunc(std::max(val.getActiveBits(), 1u));
+          auto offsetType =
+              IntegerType::get(ctx, val.getBitWidth(), IntegerType::Signed);
+          auto offset = hwarith::ConstantOp::create(
+              rewriter, loc, offsetType, IntegerAttr::get(offsetType, val));
+          // result needs to be unsigned and respect access size
+          auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offset});
+          auto idxType = IntegerType::get(ctx, std::min(addRes.getType().getWidth(), maxIndexWidth), IntegerType::Unsigned);
+          auto newBase = hwarith::CastOp::create(
+              rewriter, loc, idxType, addRes);
+          // TODO: are the values in the right order?
+          explodeRegs(
+              symbolName, structType, rewriter,
+              [&rewriter, &loc, &newBase, &toConcatenate, ctx](StringRef newRegName,
+                                                          StringAttr fieldName,
+                                                          IntegerType type) {
+                auto gotValue = coredsl::GetOp::create(
+                    rewriter, loc, type, newBase, nullptr, nullptr, newRegName);
+                auto gotType = cast<IntegerType>(gotValue.getType());
+                Operation* result = gotValue;
+                if (gotType.getSignedness() != IntegerType::Signless) {
+                    auto signlessType = IntegerType::get(ctx, gotType.getWidth(), IntegerType::Signless);
+                    result = hwarith::CastOp::create(rewriter, loc, signlessType, gotValue);
+                }
+                toConcatenate.push_back(result->getResult(0));
+              },
+              [](hw::StructType, StringAttr) {},
+              [](hw::StructType, StringAttr) {});
+        }
+        // TODO: remove duplicate return
+        auto result = comb::ConcatOp::create(rewriter, loc, toConcatenate);
+        IntegerType resultSignlessType = cast<IntegerType>(result.getType());
+        auto resultCast = hwarith::CastOp::create(
+            rewriter, loc,
+            IntegerType::get(ctx, resultSignlessType.getWidth(),
+                             IntegerType::Unsigned),
+            result);
+        replacement = resultCast.getResult();
+      } else {
+        SmallVector<hw::StructCreateOp> structOps;
+        SmallVector<Value> structMembers;
+        SmallVector<size_t> structBeginIndices = {0};
+        explodeRegs(
+            symbolName, structType, rewriter,
+            [&rewriter, &loc, &structMembers, &base, &from,
+             &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
+              auto gotValue = coredsl::GetOp::create(rewriter, loc, type, base,
+                                                     from, to, newRegName);
+              structMembers.push_back(gotValue.getResult());
+            },
+            [&structBeginIndices, &structMembers](hw::StructType, StringAttr) {
+              structBeginIndices.push_back(structMembers.size());
+            },
+            [&rewriter, &loc, &structBeginIndices,
+             &structMembers](hw::StructType type, StringAttr fieldName) {
+              const size_t structBeginIdx = structBeginIndices.back();
+              auto currStructMembers = ArrayRef(
+                  structMembers.begin() + structBeginIdx, structMembers.end());
+              auto structVal = hw::StructCreateOp::create(rewriter, loc, type,
+                                                          currStructMembers);
+              structMembers.resize(structBeginIdx);
+              structBeginIndices.pop_back();
+              structMembers.push_back(structVal.getResult());
+            });
+        auto finalStruct =
+            hw::StructCreateOp::create(rewriter, loc, type, structMembers);
+        replacement = finalStruct.getResult();
+      }
+      rewriter.replaceOp(op, replacement);
       return LogicalResult::success();
     }
     return LogicalResult::failure();
@@ -184,10 +253,13 @@ struct CoreDSLExplodeStructRegisters
     coredsl::ISAXOp isax = getOperation();
     auto &ctx = getContext();
     RewritePatternSet patterns{&ctx};
-    llvm::StringMap<hw::StructType> nameToTypeMap;
-    patterns.insert<StructExploderPattern>(&ctx, nameToTypeMap);
+    llvm::StringMap<hw::StructType> symToTypeMap;
+    llvm::StringMap<unsigned> symToMaxIndexWidthMap;
+    patterns.insert<StructExploderPattern>(&ctx, symToTypeMap,
+                                           symToMaxIndexWidthMap);
     ConversionTarget target{ctx};
-    target.addLegalDialect<hw::HWDialect, coredsl::CoreDSLDialect>();
+    target.addLegalDialect<hwarith::HWArithDialect, comb::CombDialect,
+                           hw::HWDialect, coredsl::CoreDSLDialect>();
     target.addDynamicallyLegalOp<coredsl::RegisterOp>(
         [](coredsl::RegisterOp op) { return op.getElementType().isInteger(); });
     if (failed(applyPartialConversion(isax, target, std::move(patterns)))) {
@@ -195,10 +267,15 @@ struct CoreDSLExplodeStructRegisters
     }
     patterns.clear();
     target.addDynamicallyLegalOp<coredsl::GetOp>(
-        [](coredsl::GetOp op) { return op.getResult().getType().isInteger(); });
+        [&symToTypeMap](coredsl::GetOp op) {
+          return symToTypeMap.find(op.getSym()) == symToTypeMap.end();
+        });
     target.addDynamicallyLegalOp<coredsl::SetOp>(
-        [](coredsl::SetOp op) { return op.getValue().getType().isInteger(); });
-    patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(&ctx, nameToTypeMap);
+        [&symToTypeMap](coredsl::SetOp op) {
+          return symToTypeMap.find(op.getSym()) == symToTypeMap.end();
+        });
+    patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(
+        &ctx, symToTypeMap, symToMaxIndexWidthMap);
 
     if (failed(applyPartialConversion(isax, target, std::move(patterns)))) {
       return signalPassFailure();
