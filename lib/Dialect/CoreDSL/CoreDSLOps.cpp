@@ -707,10 +707,15 @@ static LogicalResult checkAccess(AccessOpTy op, Type requiredType) {
                                       intType.getSignedness());
     } else if (auto structType =
                    dyn_cast<circt::hw::StructType>(info->elementType)) {
-      // TODO: Are accesses with access width > 1 supported by CoreDSL?
-      assert(op.getAccessWidth() == 1 &&
-             "Access with may only be 1 for struct types");
-      expectedType = structType;
+      if (op.getAccessWidth() == 1) {
+        expectedType = structType;
+      } else {
+        // The structs get converted to integers with ranged accesses
+        expectedType = IntegerType::get(op.getContext(),
+                                        circt::hw::getBitWidth(structType) *
+                                            op.getAccessWidth(),
+                                        IntegerType::Unsigned);
+      }
     } else {
       llvm_unreachable("Unexpected type");
     }
