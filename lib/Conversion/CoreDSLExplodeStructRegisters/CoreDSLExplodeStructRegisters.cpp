@@ -128,14 +128,14 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
     if (found != symNameToType.end()) {
       auto structType = found->second;
       if (to != nullptr) {
-        // Handle ranged access
+        // Handle ranged access: Because the input value is an integer of size
+        // range-size * struct-size, we need to extract the relevant values
+        // manually and assign them to the right scalar register
         auto value = op.getValue();
         auto idxType = IndexType::get(ctx);
         size_t currBitPos = 0;
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
           const IntegerAttr idxAttr = i == 0 ? IntegerAttr::get(IntegerType::get(ctx, 1, IntegerType::Unsigned), 0) : IntegerAttr::get(ctx, APSInt::get(i));
-          assert(idxAttr.getType().getIntOrFloatBitWidth());
-          // TODO: Type
           auto offsetConstant = hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
           // TODO: type is probably wrong
           auto offsetIdx = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
@@ -217,6 +217,9 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
       auto loc = op.getLoc();
       Value replacement = nullptr;
       if (to != nullptr) {
+        // Handle ranged access: Because the return value is a scalar value in
+        // this case, read all scalar values from the exploded registers and
+        // concatenate them using comb.concat
         assert(from);
         SmallVector<Value> toConcatenate;
         const unsigned maxIndexWidth =
