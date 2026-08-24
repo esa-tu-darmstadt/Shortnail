@@ -48,14 +48,20 @@ void explodeRegs(std::string &regName, hw::StructType type,
   }
 }
 
-static constexpr auto emptyStructMemberEntryExitAction = [](hw::StructType, StringAttr){};
+static constexpr auto emptyStructMemberEntryExitAction = [](hw::StructType,
+                                                            StringAttr) {};
 
-template <typename ScalarValueAction, typename StructMemberEntryAction = decltype(emptyStructMemberEntryExitAction),
-          typename StructMemberExitAction = decltype(emptyStructMemberEntryExitAction)>
+template <typename ScalarValueAction,
+          typename StructMemberEntryAction =
+              decltype(emptyStructMemberEntryExitAction),
+          typename StructMemberExitAction =
+              decltype(emptyStructMemberEntryExitAction)>
 void explodeRegs(StringRef regName, hw::StructType type,
                  ScalarValueAction scalarValueAction,
-                 StructMemberEntryAction structMemberEntryAction = emptyStructMemberEntryExitAction,
-                 StructMemberExitAction structMemberExitAction = emptyStructMemberEntryExitAction) {
+                 StructMemberEntryAction structMemberEntryAction =
+                     emptyStructMemberEntryExitAction,
+                 StructMemberExitAction structMemberExitAction =
+                     emptyStructMemberEntryExitAction) {
   auto nameString = std::string(regName);
   return explodeRegs(nameString, type, scalarValueAction,
                      structMemberEntryAction, structMemberExitAction);
@@ -135,28 +141,46 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         auto idxType = IndexType::get(ctx);
         size_t currBitPos = 0;
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
-          const IntegerAttr idxAttr = i == 0 ? IntegerAttr::get(IntegerType::get(ctx, 1, IntegerType::Unsigned), 0) : IntegerAttr::get(ctx, APSInt::get(i));
-          auto offsetConstant = hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
+          const IntegerAttr idxAttr =
+              i == 0 ? IntegerAttr::get(
+                           IntegerType::get(ctx, 1, IntegerType::Unsigned), 0)
+                     : IntegerAttr::get(ctx, APSInt::get(i));
+          auto offsetConstant = hwarith::ConstantOp::create(
+              rewriter, loc, idxAttr.getType(), idxAttr);
           // TODO: type is probably wrong
-          auto offsetIdx = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
-          const unsigned maxIndexWidth = symNameToMaxIndexWidth.find(symbolName)->second;
-          auto regIdxType = IntegerType::get(ctx, std::min(offsetIdx.getType().getWidth(), maxIndexWidth), IntegerType::Unsigned);
-          auto idxVal = hwarith::CastOp::create(rewriter, loc, regIdxType, offsetIdx);
+          auto offsetIdx =
+              hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
+          const unsigned maxIndexWidth =
+              symNameToMaxIndexWidth.find(symbolName)->second;
+          auto regIdxType = IntegerType::get(
+              ctx, std::min(offsetIdx.getType().getWidth(), maxIndexWidth),
+              IntegerType::Unsigned);
+          auto idxVal =
+              hwarith::CastOp::create(rewriter, loc, regIdxType, offsetIdx);
           explodeRegs(
               symbolName, structType,
-              [&rewriter, &currBitPos, &loc, &value, &idxVal, idxType, ctx](StringRef newRegName, StringAttr fieldName, IntegerType type) {
+              [&rewriter, &currBitPos, &loc, &value, &idxVal, idxType,
+               ctx](StringRef newRegName, StringAttr fieldName,
+                    IntegerType type) {
                 const size_t bitsBegin = currBitPos;
                 const size_t bitsEnd = currBitPos + type.getWidth() - 1;
                 const auto bitsBeginAttr = IntegerAttr::get(idxType, bitsBegin);
                 const auto bitsEndAttr = IntegerAttr::get(idxType, bitsEnd);
                 assert(!type.isSignless());
-                IntegerType bitExtractResType = type.isSigned() ? IntegerType::get(ctx, type.getWidth(), IntegerType::Unsigned) : type;
-                auto extractedBits = coredsl::BitExtractOp::create(rewriter, loc, bitExtractResType, nullptr, bitsBeginAttr, bitsEndAttr, value);
+                IntegerType bitExtractResType =
+                    type.isSigned() ? IntegerType::get(ctx, type.getWidth(),
+                                                       IntegerType::Unsigned)
+                                    : type;
+                auto extractedBits = coredsl::BitExtractOp::create(
+                    rewriter, loc, bitExtractResType, nullptr, bitsBeginAttr,
+                    bitsEndAttr, value);
                 Operation *valueToWrite = extractedBits;
                 if (bitExtractResType != type) {
-                  valueToWrite = coredsl::CastOp::create(rewriter, loc, type, extractedBits);
+                  valueToWrite = coredsl::CastOp::create(rewriter, loc, type,
+                                                         extractedBits);
                 }
-                coredsl::SetOp::create(rewriter, loc, idxVal, nullptr, nullptr, newRegName, valueToWrite->getResult(0));
+                coredsl::SetOp::create(rewriter, loc, idxVal, nullptr, nullptr,
+                                       newRegName, valueToWrite->getResult(0));
                 currBitPos += type.getWidth();
               });
         }
@@ -164,8 +188,8 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
         explodeRegs(
             symbolName, structType,
-            [&rewriter, &opStack, &loc, &base, &from,
-             &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
+            [&rewriter, &opStack, &loc, &base, &from, &to](
+                StringRef newRegName, StringAttr fieldName, IntegerType type) {
               auto writtenValue = opStack.back();
               auto extractOp = hw::StructExtractOp::create(
                   rewriter, loc, writtenValue->getResult(0), fieldName);
