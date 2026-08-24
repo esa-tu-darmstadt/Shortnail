@@ -20,27 +20,43 @@ using namespace circt;
 
 namespace {
 
+// Traverses a struct typed register, calling callbacks during traversal
+// The callbacks are called with a string that consists of the register name,
+// concatenated with the member names, so we can either explode the struct,
+// or reference the already exploded registers
 template <typename ScalarValueAction, typename StructMemberEntryAction,
           typename StructMemberExitAction>
-void explodeRegs(StringRef regName, hw::StructType type,
-                 ConversionPatternRewriter &rewriter,
+void explodeRegs(std::string &regName, hw::StructType type,
                  ScalarValueAction scalarValueAction,
                  StructMemberEntryAction structMemberEntryAction,
                  StructMemberExitAction structMemberExitAction) {
+  const size_t regNameSize = regName.size();
   for (hw::StructType::FieldInfo fieldInfo : type.getElements()) {
-    auto newRegName = std::string(regName);
-    newRegName += "_";
-    newRegName += fieldInfo.name.getValue();
+    regName += "_";
+    regName += fieldInfo.name.getValue();
     if (auto structType = llvm::dyn_cast<hw::StructType>(fieldInfo.type)) {
       structMemberEntryAction(structType, fieldInfo.name);
-      explodeRegs(newRegName, structType, rewriter, scalarValueAction,
+      explodeRegs(regName, structType, scalarValueAction,
                   structMemberEntryAction, structMemberExitAction);
       structMemberExitAction(structType, fieldInfo.name);
     } else {
-      scalarValueAction(newRegName, fieldInfo.name,
+      scalarValueAction(regName, fieldInfo.name,
                         llvm::cast<IntegerType>(fieldInfo.type));
     }
+    // Reset the string for the next iteration
+    regName.resize(regNameSize);
   }
+}
+
+template <typename ScalarValueAction, typename StructMemberEntryAction,
+          typename StructMemberExitAction>
+void explodeRegs(StringRef regName, hw::StructType type,
+                 ScalarValueAction scalarValueAction,
+                 StructMemberEntryAction structMemberEntryAction,
+                 StructMemberExitAction structMemberExitAction) {
+  auto nameString = std::string(regName);
+  return explodeRegs(nameString, type, scalarValueAction,
+                     structMemberEntryAction, structMemberExitAction);
 }
 
 struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
@@ -63,7 +79,7 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
       rewriter.setInsertionPointAfter(op);
       Location loc = op.getLoc();
       explodeRegs(
-          name, structType, rewriter,
+          name, structType,
           [&rewriter, &loc, &op, &numElements](StringRef newRegName,
                                                StringAttr fieldName,
                                                IntegerType fieldType) {
@@ -103,14 +119,14 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
     auto from = op.getFromAttr();
     auto to = op.getToAttr();
     // Check if the symbol is one of the removed ones
-    auto found = symNameToType.find(op.getSym());
+    StringRef symbolName = op.getSym();
+    auto found = symNameToType.find(symbolName);
     if (found != symNameToType.end()) {
       auto structType = found->second;
-      StringRef symbolName = op.getSym();
       auto loc = op.getLoc();
       SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
       explodeRegs(
-          symbolName, structType, rewriter,
+          symbolName, structType,
           [&rewriter, &opStack, &loc, &base, &from,
            &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
             auto writtenValue = opStack.back();
@@ -166,7 +182,7 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         assert(from);
         SmallVector<Value> toConcatenate;
         const unsigned maxIndexWidth =
-            symNameToMaxIndexWidth.find(op.getSym())->second;
+            symNameToMaxIndexWidth.find(symbolName)->second;
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
           APInt val{64, (uint64_t)i, true};
           val = val.trunc(std::max(val.getActiveBits(), 1u));
@@ -176,22 +192,26 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
               rewriter, loc, offsetType, IntegerAttr::get(offsetType, val));
           // result needs to be unsigned and respect access size
           auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offset});
-          auto idxType = IntegerType::get(ctx, std::min(addRes.getType().getWidth(), maxIndexWidth), IntegerType::Unsigned);
-          auto newBase = hwarith::CastOp::create(
-              rewriter, loc, idxType, addRes);
+          auto idxType = IntegerType::get(
+              ctx, std::min(addRes.getType().getWidth(), maxIndexWidth),
+              IntegerType::Unsigned);
+          auto newBase =
+              hwarith::CastOp::create(rewriter, loc, idxType, addRes);
           // TODO: are the values in the right order?
           explodeRegs(
-              symbolName, structType, rewriter,
-              [&rewriter, &loc, &newBase, &toConcatenate, ctx](StringRef newRegName,
-                                                          StringAttr fieldName,
-                                                          IntegerType type) {
+              symbolName, structType,
+              [&rewriter, &loc, &newBase, &toConcatenate,
+               ctx](StringRef newRegName, StringAttr fieldName,
+                    IntegerType type) {
                 auto gotValue = coredsl::GetOp::create(
                     rewriter, loc, type, newBase, nullptr, nullptr, newRegName);
                 auto gotType = cast<IntegerType>(gotValue.getType());
-                Operation* result = gotValue;
+                Operation *result = gotValue;
                 if (gotType.getSignedness() != IntegerType::Signless) {
-                    auto signlessType = IntegerType::get(ctx, gotType.getWidth(), IntegerType::Signless);
-                    result = hwarith::CastOp::create(rewriter, loc, signlessType, gotValue);
+                  auto signlessType = IntegerType::get(ctx, gotType.getWidth(),
+                                                       IntegerType::Signless);
+                  result = hwarith::CastOp::create(rewriter, loc, signlessType,
+                                                   gotValue);
                 }
                 toConcatenate.push_back(result->getResult(0));
               },
@@ -212,9 +232,9 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         SmallVector<Value> structMembers;
         SmallVector<size_t> structBeginIndices = {0};
         explodeRegs(
-            symbolName, structType, rewriter,
-            [&rewriter, &loc, &structMembers, &base, &from,
-             &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
+            symbolName, structType,
+            [&rewriter, &loc, &structMembers, &base, &from, &to](
+                StringRef newRegName, StringAttr fieldName, IntegerType type) {
               auto gotValue = coredsl::GetOp::create(rewriter, loc, type, base,
                                                      from, to, newRegName);
               structMembers.push_back(gotValue.getResult());
