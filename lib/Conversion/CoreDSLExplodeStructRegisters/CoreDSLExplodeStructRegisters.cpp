@@ -48,12 +48,14 @@ void explodeRegs(std::string &regName, hw::StructType type,
   }
 }
 
-template <typename ScalarValueAction, typename StructMemberEntryAction,
-          typename StructMemberExitAction>
+static constexpr auto emptyStructMemberEntryExitAction = [](hw::StructType, StringAttr){};
+
+template <typename ScalarValueAction, typename StructMemberEntryAction = decltype(emptyStructMemberEntryExitAction),
+          typename StructMemberExitAction = decltype(emptyStructMemberEntryExitAction)>
 void explodeRegs(StringRef regName, hw::StructType type,
                  ScalarValueAction scalarValueAction,
-                 StructMemberEntryAction structMemberEntryAction,
-                 StructMemberExitAction structMemberExitAction) {
+                 StructMemberEntryAction structMemberEntryAction = emptyStructMemberEntryExitAction,
+                 StructMemberExitAction structMemberExitAction = emptyStructMemberEntryExitAction) {
   auto nameString = std::string(regName);
   return explodeRegs(nameString, type, scalarValueAction,
                      structMemberEntryAction, structMemberExitAction);
@@ -115,36 +117,72 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
   LogicalResult
   matchAndRewrite(coredsl::SetOp op, OpAdaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto ctx = getContext();
     auto base = op.getBase();
     auto from = op.getFromAttr();
     auto to = op.getToAttr();
+    auto loc = op.getLoc();
     // Check if the symbol is one of the removed ones
     StringRef symbolName = op.getSym();
     auto found = symNameToType.find(symbolName);
     if (found != symNameToType.end()) {
       auto structType = found->second;
-      auto loc = op.getLoc();
-      SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
-      explodeRegs(
-          symbolName, structType,
-          [&rewriter, &opStack, &loc, &base, &from,
-           &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
-            auto writtenValue = opStack.back();
-            auto extractOp = hw::StructExtractOp::create(
-                rewriter, loc, writtenValue->getResult(0), fieldName);
-            coredsl::SetOp::create(rewriter, loc, base, from, to, newRegName,
-                                   extractOp->getResult(0));
-          },
-          [&rewriter, &opStack, &loc](hw::StructType type,
-                                      StringAttr fieldName) {
-            auto toExtractFrom = opStack.back();
-            Value structVal = toExtractFrom->getResult(0);
-            assert(llvm::isa<hw::StructType>(structVal.getType()));
-            auto extractOp = hw::StructExtractOp::create(
-                rewriter, loc, toExtractFrom->getResult(0), fieldName);
-            opStack.push_back(extractOp);
-          },
-          [&opStack](hw::StructType, StringAttr) { opStack.pop_back(); });
+      if (to != nullptr) {
+        // Handle ranged access
+        auto value = op.getValue();
+        auto idxType = IndexType::get(ctx);
+        size_t currBitPos = 0;
+        for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
+          const IntegerAttr idxAttr = i == 0 ? IntegerAttr::get(IntegerType::get(ctx, 1, IntegerType::Unsigned), 0) : IntegerAttr::get(ctx, APSInt::get(i));
+          assert(idxAttr.getType().getIntOrFloatBitWidth());
+          // TODO: Type
+          auto offsetConstant = hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
+          // TODO: type is probably wrong
+          auto offsetIdx = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
+          const unsigned maxIndexWidth = symNameToMaxIndexWidth.find(symbolName)->second;
+          auto regIdxType = IntegerType::get(ctx, std::min(offsetIdx.getType().getWidth(), maxIndexWidth), IntegerType::Unsigned);
+          auto idxVal = hwarith::CastOp::create(rewriter, loc, regIdxType, offsetIdx);
+          explodeRegs(
+              symbolName, structType,
+              [&rewriter, &currBitPos, &loc, &value, &idxVal, idxType, ctx](StringRef newRegName, StringAttr fieldName, IntegerType type) {
+                const size_t bitsBegin = currBitPos;
+                const size_t bitsEnd = currBitPos + type.getWidth() - 1;
+                const auto bitsBeginAttr = IntegerAttr::get(idxType, bitsBegin);
+                const auto bitsEndAttr = IntegerAttr::get(idxType, bitsEnd);
+                assert(!type.isSignless());
+                IntegerType bitExtractResType = type.isSigned() ? IntegerType::get(ctx, type.getWidth(), IntegerType::Unsigned) : type;
+                auto extractedBits = coredsl::BitExtractOp::create(rewriter, loc, bitExtractResType, nullptr, bitsBeginAttr, bitsEndAttr, value);
+                Operation *valueToWrite = extractedBits;
+                if (bitExtractResType != type) {
+                  valueToWrite = coredsl::CastOp::create(rewriter, loc, type, extractedBits);
+                }
+                coredsl::SetOp::create(rewriter, loc, idxVal, nullptr, nullptr, newRegName, valueToWrite->getResult(0));
+                currBitPos += type.getWidth();
+              });
+        }
+      } else {
+        SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
+        explodeRegs(
+            symbolName, structType,
+            [&rewriter, &opStack, &loc, &base, &from,
+             &to](StringRef newRegName, StringAttr fieldName, IntegerType type) {
+              auto writtenValue = opStack.back();
+              auto extractOp = hw::StructExtractOp::create(
+                  rewriter, loc, writtenValue->getResult(0), fieldName);
+              coredsl::SetOp::create(rewriter, loc, base, from, to, newRegName,
+                                     extractOp->getResult(0));
+            },
+            [&rewriter, &opStack, &loc](hw::StructType type,
+                                        StringAttr fieldName) {
+              auto toExtractFrom = opStack.back();
+              Value structVal = toExtractFrom->getResult(0);
+              assert(llvm::isa<hw::StructType>(structVal.getType()));
+              auto extractOp = hw::StructExtractOp::create(
+                  rewriter, loc, toExtractFrom->getResult(0), fieldName);
+              opStack.push_back(extractOp);
+            },
+            [&opStack](hw::StructType, StringAttr) { opStack.pop_back(); });
+      }
       rewriter.eraseOp(op);
       return LogicalResult::success();
     }
@@ -214,11 +252,8 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
                                                    gotValue);
                 }
                 toConcatenate.push_back(result->getResult(0));
-              },
-              [](hw::StructType, StringAttr) {},
-              [](hw::StructType, StringAttr) {});
+              });
         }
-        // TODO: remove duplicate return
         auto result = comb::ConcatOp::create(rewriter, loc, toConcatenate);
         IntegerType resultSignlessType = cast<IntegerType>(result.getType());
         auto resultCast = hwarith::CastOp::create(
