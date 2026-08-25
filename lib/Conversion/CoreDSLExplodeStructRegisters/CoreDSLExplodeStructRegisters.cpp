@@ -115,20 +115,21 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
 static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
                                  MLIRContext *ctx, Value base, int64_t offset,
                                  unsigned maxIndexWidth, Location loc) {
-  if (offset == 0) {
-    return base;
+  Value offsetResult = base;
+  if (offset != 0) {
+    const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
+    auto offsetConstant =
+        hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
+    offsetResult =
+        hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
   }
-  const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
-  auto offsetConstant =
-      hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
-  auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
   const unsigned neededWidth =
-      std::min(addRes.getType().getWidth(), maxIndexWidth);
-  if (neededWidth == addRes.getType().getWidth()) {
-    return addRes;
+      std::min(offsetResult.getType().getIntOrFloatBitWidth(), maxIndexWidth);
+  if (neededWidth == offsetResult.getType().getIntOrFloatBitWidth()) {
+    return offsetResult;
   }
   auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
-  return hwarith::CastOp::create(rewriter, loc, idxType, addRes);
+  return hwarith::CastOp::create(rewriter, loc, idxType, offsetResult);
 }
 
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
