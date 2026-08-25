@@ -110,19 +110,23 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
   }
 };
 
-static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter, MLIRContext *ctx, Value base, int64_t offset, unsigned maxIndexWidth, Location loc) {
-    if (offset == 0) {
-        return base;
-    }
-    const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
-    auto offsetConstant = hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
-    auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
-    const unsigned neededWidth = std::min(addRes.getType().getWidth(), maxIndexWidth);
-    if (neededWidth == addRes.getType().getWidth()) {
-        return addRes;
-    }
-    auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
-    return hwarith::CastOp::create(rewriter, loc, idxType, addRes);
+static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
+                                 MLIRContext *ctx, Value base, int64_t offset,
+                                 unsigned maxIndexWidth, Location loc) {
+  if (offset == 0) {
+    return base;
+  }
+  const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
+  auto offsetConstant =
+      hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
+  auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
+  const unsigned neededWidth =
+      std::min(addRes.getType().getWidth(), maxIndexWidth);
+  if (neededWidth == addRes.getType().getWidth()) {
+    return addRes;
+  }
+  auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
+  return hwarith::CastOp::create(rewriter, loc, idxType, addRes);
 }
 
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
@@ -158,7 +162,8 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         const unsigned maxIndexWidth =
             symNameToMaxIndexWidth.find(symbolName)->second;
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
-          auto idxVal = emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
+          auto idxVal =
+              emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
           explodeRegs(
               symbolName, structType,
               [&rewriter, &currBitPos, &loc, &value, &idxVal, idxType,
@@ -251,7 +256,8 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         const unsigned maxIndexWidth =
             symNameToMaxIndexWidth.find(symbolName)->second;
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
-          auto newBase = emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
+          auto newBase =
+              emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
           // TODO: are the values in the right order?
           explodeRegs(
               symbolName, structType,
