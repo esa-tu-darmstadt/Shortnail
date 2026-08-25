@@ -110,6 +110,21 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
   }
 };
 
+static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter, MLIRContext *ctx, Value base, int64_t offset, unsigned maxIndexWidth, Location loc) {
+    if (offset == 0) {
+        return base;
+    }
+    const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
+    auto offsetConstant = hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
+    auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
+    const unsigned neededWidth = std::min(addRes.getType().getWidth(), maxIndexWidth);
+    if (neededWidth == addRes.getType().getWidth()) {
+        return addRes;
+    }
+    auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
+    return hwarith::CastOp::create(rewriter, loc, idxType, addRes);
+}
+
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
   const llvm::StringMap<hw::StructType> &symNameToType;
   const llvm::StringMap<unsigned> &symNameToMaxIndexWidth;
@@ -140,23 +155,10 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         auto value = op.getValue();
         auto idxType = IndexType::get(ctx);
         size_t currBitPos = 0;
+        const unsigned maxIndexWidth =
+            symNameToMaxIndexWidth.find(symbolName)->second;
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
-          const IntegerAttr idxAttr =
-              i == 0 ? IntegerAttr::get(
-                           IntegerType::get(ctx, 1, IntegerType::Unsigned), 0)
-                     : IntegerAttr::get(ctx, APSInt::get(i));
-          auto offsetConstant = hwarith::ConstantOp::create(
-              rewriter, loc, idxAttr.getType(), idxAttr);
-          // TODO: type is probably wrong
-          auto offsetIdx =
-              hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
-          const unsigned maxIndexWidth =
-              symNameToMaxIndexWidth.find(symbolName)->second;
-          auto regIdxType = IntegerType::get(
-              ctx, std::min(offsetIdx.getType().getWidth(), maxIndexWidth),
-              IntegerType::Unsigned);
-          auto idxVal =
-              hwarith::CastOp::create(rewriter, loc, regIdxType, offsetIdx);
+          auto idxVal = emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
           explodeRegs(
               symbolName, structType,
               [&rewriter, &currBitPos, &loc, &value, &idxVal, idxType,
@@ -249,19 +251,7 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         const unsigned maxIndexWidth =
             symNameToMaxIndexWidth.find(symbolName)->second;
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
-          APInt val{64, (uint64_t)i, true};
-          val = val.trunc(std::max(val.getActiveBits(), 1u));
-          auto offsetType =
-              IntegerType::get(ctx, val.getBitWidth(), IntegerType::Signed);
-          auto offset = hwarith::ConstantOp::create(
-              rewriter, loc, offsetType, IntegerAttr::get(offsetType, val));
-          // result needs to be unsigned and respect access size
-          auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offset});
-          auto idxType = IntegerType::get(
-              ctx, std::min(addRes.getType().getWidth(), maxIndexWidth),
-              IntegerType::Unsigned);
-          auto newBase =
-              hwarith::CastOp::create(rewriter, loc, idxType, addRes);
+          auto newBase = emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
           // TODO: are the values in the right order?
           explodeRegs(
               symbolName, structType,
