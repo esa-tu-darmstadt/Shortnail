@@ -120,9 +120,12 @@ static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
     // maxIndexWidth, the original op was not valid in the first place
     return base;
   }
-  const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
-  auto offsetConstant =
-      hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
+  const auto offsetType =
+      IntegerType::get(ctx, llvm::bit_width(static_cast<uint64_t>(offset)) + 1,
+                       IntegerType::Signed);
+  const auto offsetAttr = IntegerAttr::get(offsetType, offset);
+  auto offsetConstant = hwarith::ConstantOp::create(
+      rewriter, loc, offsetAttr.getType(), offsetAttr);
   auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
   const unsigned neededWidth =
       std::min(addRes.getType().getWidth(), maxIndexWidth);
