@@ -115,21 +115,22 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
 static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
                                  MLIRContext *ctx, Value base, int64_t offset,
                                  unsigned maxIndexWidth, Location loc) {
-  Value offsetResult = base;
-  if (offset != 0) {
-    const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
-    auto offsetConstant =
-        hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
-    offsetResult =
-        hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
+  if (offset == 0) {
+    // We don't need to insert a cast here, because if base is larger than
+    // maxIndexWidth, the original op was not valid in the first place
+    return base;
   }
+  const auto idxAttr = IntegerAttr::get(ctx, APSInt::get(offset));
+  auto offsetConstant =
+      hwarith::ConstantOp::create(rewriter, loc, idxAttr.getType(), idxAttr);
+  auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
   const unsigned neededWidth =
-      std::min(offsetResult.getType().getIntOrFloatBitWidth(), maxIndexWidth);
-  if (neededWidth == offsetResult.getType().getIntOrFloatBitWidth()) {
-    return offsetResult;
+      std::min(addRes.getType().getWidth(), maxIndexWidth);
+  if (neededWidth == addRes.getType().getWidth()) {
+    return addRes;
   }
   auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
-  return hwarith::CastOp::create(rewriter, loc, idxType, offsetResult);
+  return hwarith::CastOp::create(rewriter, loc, idxType, addRes);
 }
 
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
