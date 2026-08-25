@@ -267,7 +267,6 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
           auto newBase =
               emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
-          // TODO: are the values in the right order?
           explodeRegs(
               symbolName, structType,
               [&rewriter, &loc, &newBase, &toConcatenate,
