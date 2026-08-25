@@ -165,6 +165,7 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         size_t currBitPos = 0;
         const unsigned maxIndexWidth =
             symNameToMaxIndexWidth.find(symbolName)->second;
+        assert(from.getInt() <= to.getInt());
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
           auto idxVal =
               emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
@@ -259,6 +260,7 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         SmallVector<Value> toConcatenate;
         const unsigned maxIndexWidth =
             symNameToMaxIndexWidth.find(symbolName)->second;
+        assert(from.getInt() <= to.getInt());
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
           auto newBase =
               emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
