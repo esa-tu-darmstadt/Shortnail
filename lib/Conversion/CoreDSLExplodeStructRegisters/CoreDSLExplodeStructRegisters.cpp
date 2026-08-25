@@ -110,6 +110,8 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
   }
 };
 
+// Emits Add of base to offset, truncating to maxIndexWidth if the result type
+// is larger
 static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
                                  MLIRContext *ctx, Value base, int64_t offset,
                                  unsigned maxIndexWidth, Location loc) {
