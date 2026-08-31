@@ -26,6 +26,7 @@ target_link_libraries(shortnail-opt
 
     ShortnailAnalyzeISAX
     ShortnailCoreDSL
+    ShortnailCoreDSLExplodeStructRegisters
     ShortnailCoreDSLLegalizeCF
     ShortnailCoreDSLToPy
     ShortnailMergeISAX
