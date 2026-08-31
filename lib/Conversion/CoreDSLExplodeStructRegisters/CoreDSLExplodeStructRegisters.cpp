@@ -339,10 +339,13 @@ struct CoreDSLExplodeStructRegisters
     coredsl::ISAXOp isax = getOperation();
     auto &ctx = getContext();
     RewritePatternSet patterns{&ctx};
-    llvm::StringMap<hw::StructType> symToTypeMap;
-    llvm::StringMap<unsigned> symToMaxIndexWidthMap;
-    patterns.insert<StructExploderPattern>(&ctx, symToTypeMap,
-                                           symToMaxIndexWidthMap);
+    // Because we are deleting the register ops when exploding the registers,
+    // we need to retain the struct type and the max index width for the passes
+    // that handle the get / set ops
+    llvm::StringMap<hw::StructType> symNameToType;
+    llvm::StringMap<unsigned> symNameToMaxIndexWidth;
+    patterns.insert<StructExploderPattern>(&ctx, symNameToType,
+                                           symNameToMaxIndexWidth);
     ConversionTarget target{ctx};
     target.addLegalDialect<hwarith::HWArithDialect, comb::CombDialect,
                            hw::HWDialect, coredsl::CoreDSLDialect>();
@@ -353,15 +356,15 @@ struct CoreDSLExplodeStructRegisters
     }
     patterns.clear();
     target.addDynamicallyLegalOp<coredsl::GetOp>(
-        [&symToTypeMap](coredsl::GetOp op) {
-          return symToTypeMap.find(op.getSym()) == symToTypeMap.end();
+        [&symNameToType](coredsl::GetOp op) {
+          return symNameToType.find(op.getSym()) == symNameToType.end();
         });
     target.addDynamicallyLegalOp<coredsl::SetOp>(
-        [&symToTypeMap](coredsl::SetOp op) {
-          return symToTypeMap.find(op.getSym()) == symToTypeMap.end();
+        [&symNameToType](coredsl::SetOp op) {
+          return symNameToType.find(op.getSym()) == symNameToType.end();
         });
     patterns.insert<StructRewriteGetOps, StructRewriteSetOps>(
-        &ctx, symToTypeMap, symToMaxIndexWidthMap);
+        &ctx, symNameToType, symNameToMaxIndexWidth);
 
     if (failed(applyPartialConversion(isax, target, std::move(patterns)))) {
       return signalPassFailure();
