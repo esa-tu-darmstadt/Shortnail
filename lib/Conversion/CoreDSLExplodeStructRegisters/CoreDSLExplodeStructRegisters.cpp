@@ -20,24 +20,23 @@ using namespace circt;
 
 namespace {
 
-// Traverses a struct typed register, calling callbacks during traversal
 // The callbacks are called with a string that consists of the register name,
-// concatenated with the member names, so we can either explode the struct,
-// or reference the already exploded registers
+// concatenated with the member names, so we can either explode the register,
+// or reference the already exploded registers by name
 template <typename ScalarValueAction, typename StructMemberEntryAction,
           typename StructMemberExitAction>
-void explodeRegs(std::string &regName, hw::StructType type,
-                 ScalarValueAction scalarValueAction,
-                 StructMemberEntryAction structMemberEntryAction,
-                 StructMemberExitAction structMemberExitAction) {
+void traverseStructReg(std::string &regName, hw::StructType type,
+                       ScalarValueAction scalarValueAction,
+                       StructMemberEntryAction structMemberEntryAction,
+                       StructMemberExitAction structMemberExitAction) {
   const size_t regNameSize = regName.size();
   for (hw::StructType::FieldInfo fieldInfo : type.getElements()) {
     regName += "_";
     regName += fieldInfo.name.getValue();
     if (auto structType = llvm::dyn_cast<hw::StructType>(fieldInfo.type)) {
       structMemberEntryAction(structType, fieldInfo.name);
-      explodeRegs(regName, structType, scalarValueAction,
-                  structMemberEntryAction, structMemberExitAction);
+      traverseStructReg(regName, structType, scalarValueAction,
+                        structMemberEntryAction, structMemberExitAction);
       structMemberExitAction(structType, fieldInfo.name);
     } else {
       scalarValueAction(regName, fieldInfo.name,
@@ -56,15 +55,15 @@ template <typename ScalarValueAction,
               decltype(emptyStructMemberEntryExitAction),
           typename StructMemberExitAction =
               decltype(emptyStructMemberEntryExitAction)>
-void explodeRegs(StringRef regName, hw::StructType type,
-                 ScalarValueAction scalarValueAction,
-                 StructMemberEntryAction structMemberEntryAction =
-                     emptyStructMemberEntryExitAction,
-                 StructMemberExitAction structMemberExitAction =
-                     emptyStructMemberEntryExitAction) {
+void traverseStructReg(StringRef regName, hw::StructType type,
+                       ScalarValueAction scalarValueAction,
+                       StructMemberEntryAction structMemberEntryAction =
+                           emptyStructMemberEntryExitAction,
+                       StructMemberExitAction structMemberExitAction =
+                           emptyStructMemberEntryExitAction) {
   auto nameString = std::string(regName);
-  return explodeRegs(nameString, type, scalarValueAction,
-                     structMemberEntryAction, structMemberExitAction);
+  return traverseStructReg(nameString, type, scalarValueAction,
+                           structMemberEntryAction, structMemberExitAction);
 }
 
 struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
@@ -86,7 +85,7 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
       StringRef name = op.getName();
       rewriter.setInsertionPointAfter(op);
       Location loc = op.getLoc();
-      explodeRegs(
+      traverseStructReg(
           name, structType,
           [&rewriter, &loc, &op, &numElements](StringRef newRegName,
                                                StringAttr fieldName,
@@ -97,8 +96,7 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
                                         op.getIsConst(), op.getIsVolatile(),
                                         numElements, {}, fieldType,
                                         op.getAccessMode());
-          },
-          [](hw::StructType, StringAttr) {}, [](hw::StructType, StringAttr) {});
+          });
       symNameToType.insert(std::make_pair(op.getSymName(), structType));
       symNameToMaxIndexWidth.insert(
           std::make_pair(op.getSymName(), op.getMaxIndexWidth()));
@@ -110,7 +108,7 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
   }
 };
 
-// Emits Add of base to offset, truncating to maxIndexWidth if the result type
+// Emits add of base to offset, truncating to maxIndexWidth if the result type
 // is larger
 static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
                                  MLIRContext *ctx, Value base, int64_t offset,
@@ -172,7 +170,7 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
           auto idxVal =
               emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
-          explodeRegs(
+          traverseStructReg(
               symbolName, structType,
               [&rewriter, &currBitPos, &loc, &value, &idxVal, idxType,
                ctx](StringRef newRegName, StringAttr fieldName,
@@ -200,8 +198,10 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
               });
         }
       } else {
+        // Single element access: Extract the struct members and set the
+        // exploded scalar registers
         SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
-        explodeRegs(
+        traverseStructReg(
             symbolName, structType,
             [&rewriter, &opStack, &loc, &base, &from, &to](
                 StringRef newRegName, StringAttr fieldName, IntegerType type) {
@@ -256,8 +256,8 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
       auto loc = op.getLoc();
       Value replacement = nullptr;
       if (to != nullptr) {
-        // Handle ranged access: Because the return value is a scalar value in
-        // this case, read all scalar values from the exploded registers and
+        // Ranged access: Because the return value is a scalar value in this
+        // case, read all scalar values from the exploded registers and
         // concatenate them using comb.concat
         assert(from);
         SmallVector<Value> toConcatenate;
@@ -267,7 +267,7 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
           auto newBase =
               emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
-          explodeRegs(
+          traverseStructReg(
               symbolName, structType,
               [&rewriter, &loc, &newBase, &toConcatenate,
                ctx](StringRef newRegName, StringAttr fieldName,
@@ -294,10 +294,13 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
             result);
         replacement = resultCast.getResult();
       } else {
-        SmallVector<hw::StructCreateOp> structOps;
+        // Single element access: Read the scalar values and bundle them into a
+        // struct
         SmallVector<Value> structMembers;
-        SmallVector<size_t> structBeginIndices = {0};
-        explodeRegs(
+        // Stores the indices in structMembers from which a nested struct's
+        // members begin, so they can be bundled into an intermediate struct
+        SmallVector<size_t> structBeginIndices = {};
+        traverseStructReg(
             symbolName, structType,
             [&rewriter, &loc, &structMembers, &base, &from, &to](
                 StringRef newRegName, StringAttr fieldName, IntegerType type) {
