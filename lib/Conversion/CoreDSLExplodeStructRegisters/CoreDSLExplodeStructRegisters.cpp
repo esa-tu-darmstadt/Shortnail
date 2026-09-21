@@ -200,27 +200,29 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
       } else {
         // Single element access: Extract the struct members and set the
         // exploded scalar registers
-        SmallVector<Operation *> opStack{op.getValue().getDefiningOp()};
+        SmallVector<Value> valueStack{op.getValue()};
         traverseStructReg(
             symbolName, structType,
-            [&rewriter, &opStack, &loc, &base, &from, &to](
+            [&rewriter, &valueStack, &loc, &base, &from, &to](
                 StringRef newRegName, StringAttr fieldName, IntegerType type) {
-              auto writtenValue = opStack.back();
+              auto writtenValue = valueStack.back();
               auto extractOp = hw::StructExtractOp::create(
-                  rewriter, loc, writtenValue->getResult(0), fieldName);
+                  rewriter, loc, writtenValue, fieldName);
               coredsl::SetOp::create(rewriter, loc, base, from, to, newRegName,
                                      extractOp->getResult(0));
             },
-            [&rewriter, &opStack, &loc](hw::StructType type,
-                                        StringAttr fieldName) {
-              auto toExtractFrom = opStack.back();
-              Value structVal = toExtractFrom->getResult(0);
+            [&rewriter, &valueStack, &loc](hw::StructType type,
+                                           StringAttr fieldName) {
+              auto toExtractFrom = valueStack.back();
+              Value structVal = toExtractFrom;
               assert(llvm::isa<hw::StructType>(structVal.getType()));
               auto extractOp = hw::StructExtractOp::create(
-                  rewriter, loc, toExtractFrom->getResult(0), fieldName);
-              opStack.push_back(extractOp);
+                  rewriter, loc, toExtractFrom, fieldName);
+              valueStack.push_back(extractOp);
             },
-            [&opStack](hw::StructType, StringAttr) { opStack.pop_back(); });
+            [&valueStack](hw::StructType, StringAttr) {
+              valueStack.pop_back();
+            });
       }
       rewriter.eraseOp(op);
       return LogicalResult::success();
