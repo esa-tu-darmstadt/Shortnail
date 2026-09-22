@@ -124,14 +124,15 @@ static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
   const auto offsetAttr = IntegerAttr::get(offsetType, offset);
   auto offsetConstant = hwarith::ConstantOp::create(
       rewriter, loc, offsetAttr.getType(), offsetAttr);
-  auto addRes = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
-  const unsigned neededWidth =
-      std::min(addRes.getType().getWidth(), maxIndexWidth);
-  if (neededWidth == addRes.getType().getWidth()) {
-    return addRes;
+  Operation *index = offsetConstant;
+  if (base != nullptr) {
+    index = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
   }
+  const unsigned indexWidth =
+      index->getResult(0).getType().getIntOrFloatBitWidth();
+  const unsigned neededWidth = std::min(indexWidth, maxIndexWidth);
   auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
-  return hwarith::CastOp::create(rewriter, loc, idxType, addRes);
+  return hwarith::CastOp::create(rewriter, loc, idxType, index->getResult(0));
 }
 
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
