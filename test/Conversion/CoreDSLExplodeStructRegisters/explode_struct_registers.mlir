@@ -1,0 +1,468 @@
+// RUN: shortnail-opt %s -coredsl-explode-struct-registers -canonicalize | shortnail-opt | FileCheck %s
+
+coredsl.isax "StructRegisters" {
+  coredsl.register local @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+  coredsl.register local @OTHER_STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+  coredsl.register local @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+  coredsl.register local @TRIPLE_NESTED_REG : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+  coredsl.register local @SCALAR_REG1 : ui32
+  coredsl.register local @SCALAR_REG2 : ui32
+  coredsl.register local @STRUCT_REGS[32] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+  coredsl.register local @OTHER_STRUCT_REGS[16] : !hw.struct<aValue: si64, aStruct: !hw.struct<vec: !hw.struct<x: ui32, y: ui32>, notNested: si32>>
+
+  func.func @testWritingBlockArgument(%v : !hw.struct<x: ui32, y: ui32>) {
+    coredsl.set @STRUCT_REG = %v : !hw.struct<x: ui32, y: ui32>
+    return
+  }
+
+  coredsl.instruction @StructRegDirectStore {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
+    %imm = coredsl.cast %TREENAIL_WAS_HERE_imm_11_0 : ui12 to ui12
+    %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
+    %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+    %0 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %1 = coredsl.cast %rs1 : ui5 to ui32
+    %2 = hw.struct_inject %0["x"], %1 : !hw.struct<x: ui32, y: ui32>
+    coredsl.set @STRUCT_REG = %2 : !hw.struct<x: ui32, y: ui32>
+    %4 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %5 = hw.struct_extract %4["x"] : !hw.struct<x: ui32, y: ui32>
+    %10 = hwarith.constant 7 : ui3
+    %11 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %12 = hw.struct_extract %11["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %13 = coredsl.cast %10 : ui3 to ui32
+    %14 = hw.struct_inject %12["x"], %13 : !hw.struct<x: ui32, y: ui32>
+    %15 = hw.struct_inject %11["vec"], %14 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    coredsl.set @NESTED_STRUCT_REG = %15 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %16 = hwarith.constant 255 : ui8
+    %17 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %18 = hw.struct_extract %17["x"] : !hw.struct<x: ui32, y: ui32>
+    %19 = coredsl.bitset %18[7:0] = %16 : (ui32, ui8) -> ui32
+    %20 = hw.struct_inject %17["x"], %19 : !hw.struct<x: ui32, y: ui32>
+    coredsl.set @STRUCT_REG = %20 : !hw.struct<x: ui32, y: ui32>
+    %21 = hwarith.constant 0 : ui1
+    %22 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %23 = hw.struct_extract %22["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %24 = hw.struct_extract %23["y"] : !hw.struct<x: ui32, y: ui32>
+    %25 = coredsl.cast %21 : ui1 to ui4
+    %26 = coredsl.bitset %24[3:0] = %25 : (ui32, ui4) -> ui32
+    %27 = hw.struct_inject %23["y"], %26 : !hw.struct<x: ui32, y: ui32>
+    %28 = hw.struct_inject %22["vec"], %27 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    coredsl.set @NESTED_STRUCT_REG = %28 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %29 = coredsl.get @TRIPLE_NESTED_REG : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+    %30 = hw.struct_extract %29["internalStruct"] : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+    %31 = hwarith.constant -1 : si32
+    %32 = hw.struct_inject %30["notNested"], %31 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %33 = hw.struct_extract %32["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %34 = hw.struct_inject %33["x"], %26 : !hw.struct<x: ui32, y: ui32>
+    %35 = hw.struct_inject %32["vec"], %34 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %36 = hw.struct_inject %29["internalStruct"], %35 : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+    coredsl.set @TRIPLE_NESTED_REG = %36 : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
+    coredsl.end
+  }
+  coredsl.instruction @TransferStructToScalarReg{lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
+    %0 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %1 = hw.struct_extract %0["x"] : !hw.struct<x: ui32, y: ui32>
+    %2 = hw.struct_extract %0["y"] : !hw.struct<x: ui32, y: ui32>
+    %3 = hwarith.constant 1 : ui1
+    %4 = hwarith.add %1, %3 : (ui32, ui1) -> ui33
+    %5 = coredsl.cast %4 : ui33 to ui32
+    coredsl.set @SCALAR_REG1 = %5 : ui32
+    coredsl.set @SCALAR_REG2 = %2 : ui32
+    coredsl.end
+  }
+
+  coredsl.instruction @StructArrays{lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
+    %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
+    %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+    %21 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    coredsl.set @STRUCT_REGS[2] = %21 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %22 = hwarith.constant 10 : ui4
+    %23 = coredsl.get @STRUCT_REGS[%rs1 : ui5] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    %24 = coredsl.cast %22 : ui4 to si32
+    %25 = hw.struct_inject %23["notNested"], %24 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    coredsl.set @STRUCT_REGS[%rs1 : ui5] = %25 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+    // Ranged access for structs: structs get converted to integer
+    %26 = coredsl.get @STRUCT_REGS[%rs1 : ui5, 0:4] : ui480
+    coredsl.set @STRUCT_REGS[%rd : ui5, 0:4] = %26 : ui480
+    // Nonzero offset
+    %27 = coredsl.get @OTHER_STRUCT_REGS[%22 : ui4, 5:7] : ui480
+    coredsl.set @OTHER_STRUCT_REGS[%22 : ui4, 1:3] = %27 : ui480
+    // No base offset
+    %28 = coredsl.get @STRUCT_REGS[5:7] : ui288
+    coredsl.set @STRUCT_REGS[6:8] = %28 : ui288
+    // Narrow base index: Previously, the index to read part of the range was
+    // emitted without a cast, which ignored the fact that the index may be
+    // signed, causing invalid mlir to be emitted
+    %29 = coredsl.get @STRUCT_REGS[%22 : ui4, 0:1] : ui192
+    coredsl.set @STRUCT_REGS[%22 : ui4, 0:1] = %29 : ui192
+    coredsl.end
+  }
+  coredsl.instruction @MultipleReturnValues("0000000", %rs1 : ui5, "00000000000000000000") {
+    %c = hwarith.constant 1 : ui1
+    %b = coredsl.cast %c : ui1 to i1
+    %a = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %q = coredsl.get @OTHER_STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %r:2 = scf.if %b -> (!hw.struct<x: ui32, y: ui32>, !hw.struct<x: ui32, y: ui32>) {
+      scf.yield %a, %q : !hw.struct<x: ui32, y: ui32>, !hw.struct<x: ui32, y: ui32>
+    } else {
+      scf.yield %q, %a : !hw.struct<x: ui32, y: ui32>, !hw.struct<x: ui32, y: ui32>
+    }
+    coredsl.set @STRUCT_REG = %r#1 : !hw.struct<x: ui32, y: ui32>
+    coredsl.end
+  }
+}
+
+// CHECK-LABEL:   coredsl.isax "StructRegisters" {
+// CHECK:           coredsl.register local @STRUCT_REG_x  : ui32
+// CHECK:           coredsl.register local @STRUCT_REG_y  : ui32
+// CHECK:           coredsl.register local @OTHER_STRUCT_REG_x  : ui32
+// CHECK:           coredsl.register local @OTHER_STRUCT_REG_y  : ui32
+// CHECK:           coredsl.register local @NESTED_STRUCT_REG_notNested  : si32
+// CHECK:           coredsl.register local @NESTED_STRUCT_REG_vec_x  : ui32
+// CHECK:           coredsl.register local @NESTED_STRUCT_REG_vec_y  : ui32
+// CHECK:           coredsl.register local @TRIPLE_NESTED_REG_internalStruct_notNested  : si32
+// CHECK:           coredsl.register local @TRIPLE_NESTED_REG_internalStruct_vec_x  : ui32
+// CHECK:           coredsl.register local @TRIPLE_NESTED_REG_internalStruct_vec_y  : ui32
+// CHECK:           coredsl.register local @TRIPLE_NESTED_REG_intVal  : ui32
+// CHECK:           coredsl.register local @SCALAR_REG1  : ui32
+// CHECK:           coredsl.register local @SCALAR_REG2  : ui32
+// CHECK:           coredsl.register local @STRUCT_REGS_notNested[32]  : si32
+// CHECK:           coredsl.register local @STRUCT_REGS_vec_x[32]  : ui32
+// CHECK:           coredsl.register local @STRUCT_REGS_vec_y[32]  : ui32
+// CHECK:           coredsl.register local @OTHER_STRUCT_REGS_aValue[16]  : si64
+// CHECK:           coredsl.register local @OTHER_STRUCT_REGS_aStruct_vec_x[16]  : ui32
+// CHECK:           coredsl.register local @OTHER_STRUCT_REGS_aStruct_vec_y[16]  : ui32
+// CHECK:           coredsl.register local @OTHER_STRUCT_REGS_aStruct_notNested[16]  : si32
+// CHECK:           func.func @testWritingBlockArgument(%[[VAL_0:.*]]: !hw.struct<x: ui32, y: ui32>) {
+// CHECK:             %[[STRUCT_EXTRACT_0:.*]] = hw.struct_extract %[[VAL_0]]["x"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_x = %[[STRUCT_EXTRACT_0]] : ui32
+// CHECK:             %[[STRUCT_EXTRACT_1:.*]] = hw.struct_extract %[[VAL_0]]["y"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_y = %[[STRUCT_EXTRACT_1]] : ui32
+// CHECK:             return
+// CHECK:           }
+// CHECK:           coredsl.instruction @StructRegDirectStore {lil.enc_immediates = {{\[\[}}["%[[VAL_1:.*]]", 11, 0, 0, "imm"]], {{\[\[}}"%[[VAL_2:.*]]", 4, 0, 0, "rs1"]], {{\[\[}}"%[[VAL_3:.*]]", 4, 0, 0, "rd"]]]}(%[[VAL_1]] : ui12, %[[VAL_2]] : ui5, "010", %[[VAL_3]] : ui5, "0000011"){
+// CHECK:             %[[CONSTANT_0:.*]] = hwarith.constant -1 : si32
+// CHECK:             %[[CONSTANT_1:.*]] = hwarith.constant 0 : ui1
+// CHECK:             %[[CONSTANT_2:.*]] = hwarith.constant 255 : ui8
+// CHECK:             %[[CONSTANT_3:.*]] = hwarith.constant 7 : ui3
+// CHECK:             %[[CAST_0:.*]] = coredsl.cast %[[VAL_2]] : ui5 to ui5
+// CHECK:             %[[GET_0:.*]] = coredsl.get @STRUCT_REG_x : ui32
+// CHECK:             %[[GET_1:.*]] = coredsl.get @STRUCT_REG_y : ui32
+// CHECK:             %[[CAST_1:.*]] = coredsl.cast %[[CAST_0]] : ui5 to ui32
+// CHECK:             coredsl.set @STRUCT_REG_x = %[[CAST_1]] : ui32
+// CHECK:             coredsl.set @STRUCT_REG_y = %[[GET_1]] : ui32
+// CHECK:             %[[GET_2:.*]] = coredsl.get @STRUCT_REG_x : ui32
+// CHECK:             %[[GET_3:.*]] = coredsl.get @STRUCT_REG_y : ui32
+// CHECK:             %[[GET_4:.*]] = coredsl.get @NESTED_STRUCT_REG_notNested : si32
+// CHECK:             %[[GET_5:.*]] = coredsl.get @NESTED_STRUCT_REG_vec_x : ui32
+// CHECK:             %[[GET_6:.*]] = coredsl.get @NESTED_STRUCT_REG_vec_y : ui32
+// CHECK:             %[[CAST_2:.*]] = coredsl.cast %[[CONSTANT_3]] : ui3 to ui32
+// CHECK:             coredsl.set @NESTED_STRUCT_REG_notNested = %[[GET_4]] : si32
+// CHECK:             coredsl.set @NESTED_STRUCT_REG_vec_x = %[[CAST_2]] : ui32
+// CHECK:             coredsl.set @NESTED_STRUCT_REG_vec_y = %[[GET_6]] : ui32
+// CHECK:             %[[GET_7:.*]] = coredsl.get @STRUCT_REG_x : ui32
+// CHECK:             %[[GET_8:.*]] = coredsl.get @STRUCT_REG_y : ui32
+// CHECK:             %[[BITSET_0:.*]] = coredsl.bitset %[[GET_7]][7:0] = %[[CONSTANT_2]] : (ui32, ui8) -> ui32
+// CHECK:             coredsl.set @STRUCT_REG_x = %[[BITSET_0]] : ui32
+// CHECK:             coredsl.set @STRUCT_REG_y = %[[GET_8]] : ui32
+// CHECK:             %[[GET_9:.*]] = coredsl.get @NESTED_STRUCT_REG_notNested : si32
+// CHECK:             %[[GET_10:.*]] = coredsl.get @NESTED_STRUCT_REG_vec_x : ui32
+// CHECK:             %[[GET_11:.*]] = coredsl.get @NESTED_STRUCT_REG_vec_y : ui32
+// CHECK:             %[[CAST_3:.*]] = coredsl.cast %[[CONSTANT_1]] : ui1 to ui4
+// CHECK:             %[[BITSET_1:.*]] = coredsl.bitset %[[GET_11]][3:0] = %[[CAST_3]] : (ui32, ui4) -> ui32
+// CHECK:             coredsl.set @NESTED_STRUCT_REG_notNested = %[[GET_9]] : si32
+// CHECK:             coredsl.set @NESTED_STRUCT_REG_vec_x = %[[GET_10]] : ui32
+// CHECK:             coredsl.set @NESTED_STRUCT_REG_vec_y = %[[BITSET_1]] : ui32
+// CHECK:             %[[GET_12:.*]] = coredsl.get @TRIPLE_NESTED_REG_internalStruct_notNested : si32
+// CHECK:             %[[GET_13:.*]] = coredsl.get @TRIPLE_NESTED_REG_internalStruct_vec_x : ui32
+// CHECK:             %[[GET_14:.*]] = coredsl.get @TRIPLE_NESTED_REG_internalStruct_vec_y : ui32
+// CHECK:             %[[GET_15:.*]] = coredsl.get @TRIPLE_NESTED_REG_intVal : ui32
+// CHECK:             coredsl.set @TRIPLE_NESTED_REG_internalStruct_notNested = %[[CONSTANT_0]] : si32
+// CHECK:             coredsl.set @TRIPLE_NESTED_REG_internalStruct_vec_x = %[[BITSET_1]] : ui32
+// CHECK:             coredsl.set @TRIPLE_NESTED_REG_internalStruct_vec_y = %[[GET_14]] : ui32
+// CHECK:             coredsl.set @TRIPLE_NESTED_REG_intVal = %[[GET_15]] : ui32
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:           coredsl.instruction @TransferStructToScalarReg {lil.enc_immediates = {{\[\[}}["%[[VAL_4:.*]]", 11, 0, 0, "imm"]], {{\[\[}}"%[[VAL_5:.*]]", 4, 0, 0, "rs1"]], {{\[\[}}"%[[VAL_6:.*]]", 4, 0, 0, "rd"]]]}(%[[VAL_4]] : ui12, %[[VAL_5]] : ui5, "010", %[[VAL_6]] : ui5, "0000011"){
+// CHECK:             %[[CONSTANT_4:.*]] = hwarith.constant 1 : ui1
+// CHECK:             %[[GET_16:.*]] = coredsl.get @STRUCT_REG_x : ui32
+// CHECK:             %[[GET_17:.*]] = coredsl.get @STRUCT_REG_y : ui32
+// CHECK:             %[[ADD_0:.*]] = hwarith.add %[[GET_16]], %[[CONSTANT_4]] : (ui32, ui1) -> ui33
+// CHECK:             %[[CAST_4:.*]] = coredsl.cast %[[ADD_0]] : ui33 to ui32
+// CHECK:             coredsl.set @SCALAR_REG1 = %[[CAST_4]] : ui32
+// CHECK:             coredsl.set @SCALAR_REG2 = %[[GET_17]] : ui32
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:           coredsl.instruction @StructArrays {lil.enc_immediates = {{\[\[}}["%[[VAL_7:.*]]", 11, 0, 0, "imm"]], {{\[\[}}"%[[VAL_8:.*]]", 4, 0, 0, "rs1"]], {{\[\[}}"%[[VAL_9:.*]]", 4, 0, 0, "rd"]]]}(%[[VAL_7]] : ui12, %[[VAL_8]] : ui5, "010", %[[VAL_9]] : ui5, "0000011"){
+// CHECK:             %[[CONSTANT_5:.*]] = hwarith.constant 8 : si5
+// CHECK:             %[[CONSTANT_6:.*]] = hwarith.constant 7 : si4
+// CHECK:             %[[CONSTANT_7:.*]] = hwarith.constant 6 : si4
+// CHECK:             %[[CONSTANT_8:.*]] = hwarith.constant 5 : si4
+// CHECK:             %[[CONSTANT_9:.*]] = hwarith.constant 4 : si4
+// CHECK:             %[[CONSTANT_10:.*]] = hwarith.constant 3 : si3
+// CHECK:             %[[CONSTANT_11:.*]] = hwarith.constant 2 : si3
+// CHECK:             %[[CONSTANT_12:.*]] = hwarith.constant 1 : si2
+// CHECK:             %[[CONSTANT_13:.*]] = hwarith.constant 10 : ui4
+// CHECK:             %[[CAST_5:.*]] = coredsl.cast %[[VAL_8]] : ui5 to ui5
+// CHECK:             %[[CAST_6:.*]] = coredsl.cast %[[VAL_9]] : ui5 to ui5
+// CHECK:             %[[GET_18:.*]] = coredsl.get @NESTED_STRUCT_REG_notNested : si32
+// CHECK:             %[[GET_19:.*]] = coredsl.get @NESTED_STRUCT_REG_vec_x : ui32
+// CHECK:             %[[GET_20:.*]] = coredsl.get @NESTED_STRUCT_REG_vec_y : ui32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested[2] = %[[GET_18]] : si32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x[2] = %[[GET_19]] : ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y[2] = %[[GET_20]] : ui32
+// CHECK:             %[[GET_21:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_5]] : ui5] : si32
+// CHECK:             %[[GET_22:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_5]] : ui5] : ui32
+// CHECK:             %[[GET_23:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_5]] : ui5] : ui32
+// CHECK:             %[[CAST_7:.*]] = coredsl.cast %[[CONSTANT_13]] : ui4 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_5]] : ui5] = %[[CAST_7]] : si32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_5]] : ui5] = %[[GET_22]] : ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_5]] : ui5] = %[[GET_23]] : ui32
+// CHECK:             %[[GET_24:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_5]] : ui5] : si32
+// CHECK:             %[[CAST_8:.*]] = hwarith.cast %[[GET_24]] : (si32) -> i32
+// CHECK:             %[[GET_25:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_5]] : ui5] : ui32
+// CHECK:             %[[CAST_9:.*]] = hwarith.cast %[[GET_25]] : (ui32) -> i32
+// CHECK:             %[[GET_26:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_5]] : ui5] : ui32
+// CHECK:             %[[CAST_10:.*]] = hwarith.cast %[[GET_26]] : (ui32) -> i32
+// CHECK:             %[[ADD_1:.*]] = hwarith.add %[[CAST_5]], %[[CONSTANT_12]] : (ui5, si2) -> si7
+// CHECK:             %[[CAST_11:.*]] = hwarith.cast %[[ADD_1]] : (si7) -> ui5
+// CHECK:             %[[GET_27:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_11]] : ui5] : si32
+// CHECK:             %[[CAST_12:.*]] = hwarith.cast %[[GET_27]] : (si32) -> i32
+// CHECK:             %[[GET_28:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_11]] : ui5] : ui32
+// CHECK:             %[[CAST_13:.*]] = hwarith.cast %[[GET_28]] : (ui32) -> i32
+// CHECK:             %[[GET_29:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_11]] : ui5] : ui32
+// CHECK:             %[[CAST_14:.*]] = hwarith.cast %[[GET_29]] : (ui32) -> i32
+// CHECK:             %[[ADD_2:.*]] = hwarith.add %[[CAST_5]], %[[CONSTANT_11]] : (ui5, si3) -> si7
+// CHECK:             %[[CAST_15:.*]] = hwarith.cast %[[ADD_2]] : (si7) -> ui5
+// CHECK:             %[[GET_30:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_15]] : ui5] : si32
+// CHECK:             %[[CAST_16:.*]] = hwarith.cast %[[GET_30]] : (si32) -> i32
+// CHECK:             %[[GET_31:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_15]] : ui5] : ui32
+// CHECK:             %[[CAST_17:.*]] = hwarith.cast %[[GET_31]] : (ui32) -> i32
+// CHECK:             %[[GET_32:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_15]] : ui5] : ui32
+// CHECK:             %[[CAST_18:.*]] = hwarith.cast %[[GET_32]] : (ui32) -> i32
+// CHECK:             %[[ADD_3:.*]] = hwarith.add %[[CAST_5]], %[[CONSTANT_10]] : (ui5, si3) -> si7
+// CHECK:             %[[CAST_19:.*]] = hwarith.cast %[[ADD_3]] : (si7) -> ui5
+// CHECK:             %[[GET_33:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_19]] : ui5] : si32
+// CHECK:             %[[CAST_20:.*]] = hwarith.cast %[[GET_33]] : (si32) -> i32
+// CHECK:             %[[GET_34:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_19]] : ui5] : ui32
+// CHECK:             %[[CAST_21:.*]] = hwarith.cast %[[GET_34]] : (ui32) -> i32
+// CHECK:             %[[GET_35:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_19]] : ui5] : ui32
+// CHECK:             %[[CAST_22:.*]] = hwarith.cast %[[GET_35]] : (ui32) -> i32
+// CHECK:             %[[ADD_4:.*]] = hwarith.add %[[CAST_5]], %[[CONSTANT_9]] : (ui5, si4) -> si7
+// CHECK:             %[[CAST_23:.*]] = hwarith.cast %[[ADD_4]] : (si7) -> ui5
+// CHECK:             %[[GET_36:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_23]] : ui5] : si32
+// CHECK:             %[[CAST_24:.*]] = hwarith.cast %[[GET_36]] : (si32) -> i32
+// CHECK:             %[[GET_37:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_23]] : ui5] : ui32
+// CHECK:             %[[CAST_25:.*]] = hwarith.cast %[[GET_37]] : (ui32) -> i32
+// CHECK:             %[[GET_38:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_23]] : ui5] : ui32
+// CHECK:             %[[CAST_26:.*]] = hwarith.cast %[[GET_38]] : (ui32) -> i32
+// CHECK:             %[[CONCAT_0:.*]] = comb.concat %[[CAST_8]], %[[CAST_9]], %[[CAST_10]], %[[CAST_12]], %[[CAST_13]], %[[CAST_14]], %[[CAST_16]], %[[CAST_17]], %[[CAST_18]], %[[CAST_20]], %[[CAST_21]], %[[CAST_22]], %[[CAST_24]], %[[CAST_25]], %[[CAST_26]] : i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32
+// CHECK:             %[[CAST_27:.*]] = hwarith.cast %[[CONCAT_0]] : (i480) -> ui480
+// CHECK:             %[[CAST_28:.*]] = coredsl.cast %[[CAST_27]] : ui480 to ui32
+// CHECK:             %[[CAST_29:.*]] = coredsl.cast %[[CAST_28]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_6]] : ui5] = %[[CAST_29]] : si32
+// CHECK:             %[[BITEXTRACT_0:.*]] = coredsl.bitextract %[[CAST_27]][63:32] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_6]] : ui5] = %[[BITEXTRACT_0]] : ui32
+// CHECK:             %[[BITEXTRACT_1:.*]] = coredsl.bitextract %[[CAST_27]][95:64] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_6]] : ui5] = %[[BITEXTRACT_1]] : ui32
+// CHECK:             %[[ADD_5:.*]] = hwarith.add %[[CAST_6]], %[[CONSTANT_12]] : (ui5, si2) -> si7
+// CHECK:             %[[CAST_30:.*]] = hwarith.cast %[[ADD_5]] : (si7) -> ui5
+// CHECK:             %[[BITEXTRACT_2:.*]] = coredsl.bitextract %[[CAST_27]][127:96] : (ui480) -> ui32
+// CHECK:             %[[CAST_31:.*]] = coredsl.cast %[[BITEXTRACT_2]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_30]] : ui5] = %[[CAST_31]] : si32
+// CHECK:             %[[BITEXTRACT_3:.*]] = coredsl.bitextract %[[CAST_27]][159:128] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_30]] : ui5] = %[[BITEXTRACT_3]] : ui32
+// CHECK:             %[[BITEXTRACT_4:.*]] = coredsl.bitextract %[[CAST_27]][191:160] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_30]] : ui5] = %[[BITEXTRACT_4]] : ui32
+// CHECK:             %[[ADD_6:.*]] = hwarith.add %[[CAST_6]], %[[CONSTANT_11]] : (ui5, si3) -> si7
+// CHECK:             %[[CAST_32:.*]] = hwarith.cast %[[ADD_6]] : (si7) -> ui5
+// CHECK:             %[[BITEXTRACT_5:.*]] = coredsl.bitextract %[[CAST_27]][223:192] : (ui480) -> ui32
+// CHECK:             %[[CAST_33:.*]] = coredsl.cast %[[BITEXTRACT_5]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_32]] : ui5] = %[[CAST_33]] : si32
+// CHECK:             %[[BITEXTRACT_6:.*]] = coredsl.bitextract %[[CAST_27]][255:224] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_32]] : ui5] = %[[BITEXTRACT_6]] : ui32
+// CHECK:             %[[BITEXTRACT_7:.*]] = coredsl.bitextract %[[CAST_27]][287:256] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_32]] : ui5] = %[[BITEXTRACT_7]] : ui32
+// CHECK:             %[[ADD_7:.*]] = hwarith.add %[[CAST_6]], %[[CONSTANT_10]] : (ui5, si3) -> si7
+// CHECK:             %[[CAST_34:.*]] = hwarith.cast %[[ADD_7]] : (si7) -> ui5
+// CHECK:             %[[BITEXTRACT_8:.*]] = coredsl.bitextract %[[CAST_27]][319:288] : (ui480) -> ui32
+// CHECK:             %[[CAST_35:.*]] = coredsl.cast %[[BITEXTRACT_8]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_34]] : ui5] = %[[CAST_35]] : si32
+// CHECK:             %[[BITEXTRACT_9:.*]] = coredsl.bitextract %[[CAST_27]][351:320] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_34]] : ui5] = %[[BITEXTRACT_9]] : ui32
+// CHECK:             %[[BITEXTRACT_10:.*]] = coredsl.bitextract %[[CAST_27]][383:352] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_34]] : ui5] = %[[BITEXTRACT_10]] : ui32
+// CHECK:             %[[ADD_8:.*]] = hwarith.add %[[CAST_6]], %[[CONSTANT_9]] : (ui5, si4) -> si7
+// CHECK:             %[[CAST_36:.*]] = hwarith.cast %[[ADD_8]] : (si7) -> ui5
+// CHECK:             %[[BITEXTRACT_11:.*]] = coredsl.bitextract %[[CAST_27]][415:384] : (ui480) -> ui32
+// CHECK:             %[[CAST_37:.*]] = coredsl.cast %[[BITEXTRACT_11]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_36]] : ui5] = %[[CAST_37]] : si32
+// CHECK:             %[[BITEXTRACT_12:.*]] = coredsl.bitextract %[[CAST_27]][447:416] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_36]] : ui5] = %[[BITEXTRACT_12]] : ui32
+// CHECK:             %[[BITEXTRACT_13:.*]] = coredsl.bitextract %[[CAST_27]][479:448] : (ui480) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_36]] : ui5] = %[[BITEXTRACT_13]] : ui32
+// CHECK:             %[[ADD_9:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_8]] : (ui4, si4) -> si6
+// CHECK:             %[[CAST_38:.*]] = hwarith.cast %[[ADD_9]] : (si6) -> ui4
+// CHECK:             %[[GET_39:.*]] = coredsl.get @OTHER_STRUCT_REGS_aValue{{\[}}%[[CAST_38]] : ui4] : si64
+// CHECK:             %[[CAST_39:.*]] = hwarith.cast %[[GET_39]] : (si64) -> i64
+// CHECK:             %[[GET_40:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_vec_x{{\[}}%[[CAST_38]] : ui4] : ui32
+// CHECK:             %[[CAST_40:.*]] = hwarith.cast %[[GET_40]] : (ui32) -> i32
+// CHECK:             %[[GET_41:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_vec_y{{\[}}%[[CAST_38]] : ui4] : ui32
+// CHECK:             %[[CAST_41:.*]] = hwarith.cast %[[GET_41]] : (ui32) -> i32
+// CHECK:             %[[GET_42:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_notNested{{\[}}%[[CAST_38]] : ui4] : si32
+// CHECK:             %[[CAST_42:.*]] = hwarith.cast %[[GET_42]] : (si32) -> i32
+// CHECK:             %[[ADD_10:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_7]] : (ui4, si4) -> si6
+// CHECK:             %[[CAST_43:.*]] = hwarith.cast %[[ADD_10]] : (si6) -> ui4
+// CHECK:             %[[GET_43:.*]] = coredsl.get @OTHER_STRUCT_REGS_aValue{{\[}}%[[CAST_43]] : ui4] : si64
+// CHECK:             %[[CAST_44:.*]] = hwarith.cast %[[GET_43]] : (si64) -> i64
+// CHECK:             %[[GET_44:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_vec_x{{\[}}%[[CAST_43]] : ui4] : ui32
+// CHECK:             %[[CAST_45:.*]] = hwarith.cast %[[GET_44]] : (ui32) -> i32
+// CHECK:             %[[GET_45:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_vec_y{{\[}}%[[CAST_43]] : ui4] : ui32
+// CHECK:             %[[CAST_46:.*]] = hwarith.cast %[[GET_45]] : (ui32) -> i32
+// CHECK:             %[[GET_46:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_notNested{{\[}}%[[CAST_43]] : ui4] : si32
+// CHECK:             %[[CAST_47:.*]] = hwarith.cast %[[GET_46]] : (si32) -> i32
+// CHECK:             %[[ADD_11:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_6]] : (ui4, si4) -> si6
+// CHECK:             %[[CAST_48:.*]] = hwarith.cast %[[ADD_11]] : (si6) -> ui4
+// CHECK:             %[[GET_47:.*]] = coredsl.get @OTHER_STRUCT_REGS_aValue{{\[}}%[[CAST_48]] : ui4] : si64
+// CHECK:             %[[CAST_49:.*]] = hwarith.cast %[[GET_47]] : (si64) -> i64
+// CHECK:             %[[GET_48:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_vec_x{{\[}}%[[CAST_48]] : ui4] : ui32
+// CHECK:             %[[CAST_50:.*]] = hwarith.cast %[[GET_48]] : (ui32) -> i32
+// CHECK:             %[[GET_49:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_vec_y{{\[}}%[[CAST_48]] : ui4] : ui32
+// CHECK:             %[[CAST_51:.*]] = hwarith.cast %[[GET_49]] : (ui32) -> i32
+// CHECK:             %[[GET_50:.*]] = coredsl.get @OTHER_STRUCT_REGS_aStruct_notNested{{\[}}%[[CAST_48]] : ui4] : si32
+// CHECK:             %[[CAST_52:.*]] = hwarith.cast %[[GET_50]] : (si32) -> i32
+// CHECK:             %[[CONCAT_1:.*]] = comb.concat %[[CAST_39]], %[[CAST_40]], %[[CAST_41]], %[[CAST_42]], %[[CAST_44]], %[[CAST_45]], %[[CAST_46]], %[[CAST_47]], %[[CAST_49]], %[[CAST_50]], %[[CAST_51]], %[[CAST_52]] : i64, i32, i32, i32, i64, i32, i32, i32, i64, i32, i32, i32
+// CHECK:             %[[CAST_53:.*]] = hwarith.cast %[[CONCAT_1]] : (i480) -> ui480
+// CHECK:             %[[ADD_12:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_12]] : (ui4, si2) -> si6
+// CHECK:             %[[CAST_54:.*]] = hwarith.cast %[[ADD_12]] : (si6) -> ui4
+// CHECK:             %[[CAST_55:.*]] = coredsl.cast %[[CAST_53]] : ui480 to ui64
+// CHECK:             %[[CAST_56:.*]] = coredsl.cast %[[CAST_55]] : ui64 to si64
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aValue{{\[}}%[[CAST_54]] : ui4] = %[[CAST_56]] : si64
+// CHECK:             %[[BITEXTRACT_14:.*]] = coredsl.bitextract %[[CAST_53]][95:64] : (ui480) -> ui32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_vec_x{{\[}}%[[CAST_54]] : ui4] = %[[BITEXTRACT_14]] : ui32
+// CHECK:             %[[BITEXTRACT_15:.*]] = coredsl.bitextract %[[CAST_53]][127:96] : (ui480) -> ui32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_vec_y{{\[}}%[[CAST_54]] : ui4] = %[[BITEXTRACT_15]] : ui32
+// CHECK:             %[[BITEXTRACT_16:.*]] = coredsl.bitextract %[[CAST_53]][159:128] : (ui480) -> ui32
+// CHECK:             %[[CAST_57:.*]] = coredsl.cast %[[BITEXTRACT_16]] : ui32 to si32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_notNested{{\[}}%[[CAST_54]] : ui4] = %[[CAST_57]] : si32
+// CHECK:             %[[ADD_13:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_11]] : (ui4, si3) -> si6
+// CHECK:             %[[CAST_58:.*]] = hwarith.cast %[[ADD_13]] : (si6) -> ui4
+// CHECK:             %[[BITEXTRACT_17:.*]] = coredsl.bitextract %[[CAST_53]][223:160] : (ui480) -> ui64
+// CHECK:             %[[CAST_59:.*]] = coredsl.cast %[[BITEXTRACT_17]] : ui64 to si64
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aValue{{\[}}%[[CAST_58]] : ui4] = %[[CAST_59]] : si64
+// CHECK:             %[[BITEXTRACT_18:.*]] = coredsl.bitextract %[[CAST_53]][255:224] : (ui480) -> ui32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_vec_x{{\[}}%[[CAST_58]] : ui4] = %[[BITEXTRACT_18]] : ui32
+// CHECK:             %[[BITEXTRACT_19:.*]] = coredsl.bitextract %[[CAST_53]][287:256] : (ui480) -> ui32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_vec_y{{\[}}%[[CAST_58]] : ui4] = %[[BITEXTRACT_19]] : ui32
+// CHECK:             %[[BITEXTRACT_20:.*]] = coredsl.bitextract %[[CAST_53]][319:288] : (ui480) -> ui32
+// CHECK:             %[[CAST_60:.*]] = coredsl.cast %[[BITEXTRACT_20]] : ui32 to si32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_notNested{{\[}}%[[CAST_58]] : ui4] = %[[CAST_60]] : si32
+// CHECK:             %[[ADD_14:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_10]] : (ui4, si3) -> si6
+// CHECK:             %[[CAST_61:.*]] = hwarith.cast %[[ADD_14]] : (si6) -> ui4
+// CHECK:             %[[BITEXTRACT_21:.*]] = coredsl.bitextract %[[CAST_53]][383:320] : (ui480) -> ui64
+// CHECK:             %[[CAST_62:.*]] = coredsl.cast %[[BITEXTRACT_21]] : ui64 to si64
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aValue{{\[}}%[[CAST_61]] : ui4] = %[[CAST_62]] : si64
+// CHECK:             %[[BITEXTRACT_22:.*]] = coredsl.bitextract %[[CAST_53]][415:384] : (ui480) -> ui32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_vec_x{{\[}}%[[CAST_61]] : ui4] = %[[BITEXTRACT_22]] : ui32
+// CHECK:             %[[BITEXTRACT_23:.*]] = coredsl.bitextract %[[CAST_53]][447:416] : (ui480) -> ui32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_vec_y{{\[}}%[[CAST_61]] : ui4] = %[[BITEXTRACT_23]] : ui32
+// CHECK:             %[[BITEXTRACT_24:.*]] = coredsl.bitextract %[[CAST_53]][479:448] : (ui480) -> ui32
+// CHECK:             %[[CAST_63:.*]] = coredsl.cast %[[BITEXTRACT_24]] : ui32 to si32
+// CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_notNested{{\[}}%[[CAST_61]] : ui4] = %[[CAST_63]] : si32
+// CHECK:             %[[CAST_64:.*]] = hwarith.cast %[[CONSTANT_8]] : (si4) -> ui4
+// CHECK:             %[[GET_51:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_64]] : ui4] : si32
+// CHECK:             %[[CAST_65:.*]] = hwarith.cast %[[GET_51]] : (si32) -> i32
+// CHECK:             %[[GET_52:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_64]] : ui4] : ui32
+// CHECK:             %[[CAST_66:.*]] = hwarith.cast %[[GET_52]] : (ui32) -> i32
+// CHECK:             %[[GET_53:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_64]] : ui4] : ui32
+// CHECK:             %[[CAST_67:.*]] = hwarith.cast %[[GET_53]] : (ui32) -> i32
+// CHECK:             %[[CAST_68:.*]] = hwarith.cast %[[CONSTANT_7]] : (si4) -> ui4
+// CHECK:             %[[GET_54:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_68]] : ui4] : si32
+// CHECK:             %[[CAST_69:.*]] = hwarith.cast %[[GET_54]] : (si32) -> i32
+// CHECK:             %[[GET_55:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_68]] : ui4] : ui32
+// CHECK:             %[[CAST_70:.*]] = hwarith.cast %[[GET_55]] : (ui32) -> i32
+// CHECK:             %[[GET_56:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_68]] : ui4] : ui32
+// CHECK:             %[[CAST_71:.*]] = hwarith.cast %[[GET_56]] : (ui32) -> i32
+// CHECK:             %[[CAST_72:.*]] = hwarith.cast %[[CONSTANT_6]] : (si4) -> ui4
+// CHECK:             %[[GET_57:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_72]] : ui4] : si32
+// CHECK:             %[[CAST_73:.*]] = hwarith.cast %[[GET_57]] : (si32) -> i32
+// CHECK:             %[[GET_58:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_72]] : ui4] : ui32
+// CHECK:             %[[CAST_74:.*]] = hwarith.cast %[[GET_58]] : (ui32) -> i32
+// CHECK:             %[[GET_59:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_72]] : ui4] : ui32
+// CHECK:             %[[CAST_75:.*]] = hwarith.cast %[[GET_59]] : (ui32) -> i32
+// CHECK:             %[[CONCAT_2:.*]] = comb.concat %[[CAST_65]], %[[CAST_66]], %[[CAST_67]], %[[CAST_69]], %[[CAST_70]], %[[CAST_71]], %[[CAST_73]], %[[CAST_74]], %[[CAST_75]] : i32, i32, i32, i32, i32, i32, i32, i32, i32
+// CHECK:             %[[CAST_76:.*]] = hwarith.cast %[[CONCAT_2]] : (i288) -> ui288
+// CHECK:             %[[CAST_77:.*]] = hwarith.cast %[[CONSTANT_7]] : (si4) -> ui4
+// CHECK:             %[[CAST_78:.*]] = coredsl.cast %[[CAST_76]] : ui288 to ui32
+// CHECK:             %[[CAST_79:.*]] = coredsl.cast %[[CAST_78]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_77]] : ui4] = %[[CAST_79]] : si32
+// CHECK:             %[[BITEXTRACT_25:.*]] = coredsl.bitextract %[[CAST_76]][63:32] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_77]] : ui4] = %[[BITEXTRACT_25]] : ui32
+// CHECK:             %[[BITEXTRACT_26:.*]] = coredsl.bitextract %[[CAST_76]][95:64] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_77]] : ui4] = %[[BITEXTRACT_26]] : ui32
+// CHECK:             %[[CAST_80:.*]] = hwarith.cast %[[CONSTANT_6]] : (si4) -> ui4
+// CHECK:             %[[BITEXTRACT_27:.*]] = coredsl.bitextract %[[CAST_76]][127:96] : (ui288) -> ui32
+// CHECK:             %[[CAST_81:.*]] = coredsl.cast %[[BITEXTRACT_27]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_80]] : ui4] = %[[CAST_81]] : si32
+// CHECK:             %[[BITEXTRACT_28:.*]] = coredsl.bitextract %[[CAST_76]][159:128] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_80]] : ui4] = %[[BITEXTRACT_28]] : ui32
+// CHECK:             %[[BITEXTRACT_29:.*]] = coredsl.bitextract %[[CAST_76]][191:160] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_80]] : ui4] = %[[BITEXTRACT_29]] : ui32
+// CHECK:             %[[CAST_82:.*]] = hwarith.cast %[[CONSTANT_5]] : (si5) -> ui5
+// CHECK:             %[[BITEXTRACT_30:.*]] = coredsl.bitextract %[[CAST_76]][223:192] : (ui288) -> ui32
+// CHECK:             %[[CAST_83:.*]] = coredsl.cast %[[BITEXTRACT_30]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_82]] : ui5] = %[[CAST_83]] : si32
+// CHECK:             %[[BITEXTRACT_31:.*]] = coredsl.bitextract %[[CAST_76]][255:224] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_82]] : ui5] = %[[BITEXTRACT_31]] : ui32
+// CHECK:             %[[BITEXTRACT_32:.*]] = coredsl.bitextract %[[CAST_76]][287:256] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_82]] : ui5] = %[[BITEXTRACT_32]] : ui32
+// CHECK:             %[[GET_60:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CONSTANT_13]] : ui4] : si32
+// CHECK:             %[[CAST_84:.*]] = hwarith.cast %[[GET_60]] : (si32) -> i32
+// CHECK:             %[[GET_61:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CONSTANT_13]] : ui4] : ui32
+// CHECK:             %[[CAST_85:.*]] = hwarith.cast %[[GET_61]] : (ui32) -> i32
+// CHECK:             %[[GET_62:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CONSTANT_13]] : ui4] : ui32
+// CHECK:             %[[CAST_86:.*]] = hwarith.cast %[[GET_62]] : (ui32) -> i32
+// CHECK:             %[[ADD_15:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_12]] : (ui4, si2) -> si6
+// CHECK:             %[[CAST_87:.*]] = hwarith.cast %[[ADD_15]] : (si6) -> ui5
+// CHECK:             %[[GET_63:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_87]] : ui5] : si32
+// CHECK:             %[[CAST_88:.*]] = hwarith.cast %[[GET_63]] : (si32) -> i32
+// CHECK:             %[[GET_64:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_87]] : ui5] : ui32
+// CHECK:             %[[CAST_89:.*]] = hwarith.cast %[[GET_64]] : (ui32) -> i32
+// CHECK:             %[[GET_65:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_87]] : ui5] : ui32
+// CHECK:             %[[CAST_90:.*]] = hwarith.cast %[[GET_65]] : (ui32) -> i32
+// CHECK:             %[[CONCAT_3:.*]] = comb.concat %[[CAST_84]], %[[CAST_85]], %[[CAST_86]], %[[CAST_88]], %[[CAST_89]], %[[CAST_90]] : i32, i32, i32, i32, i32, i32
+// CHECK:             %[[CAST_91:.*]] = hwarith.cast %[[CONCAT_3]] : (i192) -> ui192
+// CHECK:             %[[CAST_92:.*]] = coredsl.cast %[[CAST_91]] : ui192 to ui32
+// CHECK:             %[[CAST_93:.*]] = coredsl.cast %[[CAST_92]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CONSTANT_13]] : ui4] = %[[CAST_93]] : si32
+// CHECK:             %[[BITEXTRACT_33:.*]] = coredsl.bitextract %[[CAST_91]][63:32] : (ui192) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CONSTANT_13]] : ui4] = %[[BITEXTRACT_33]] : ui32
+// CHECK:             %[[BITEXTRACT_34:.*]] = coredsl.bitextract %[[CAST_91]][95:64] : (ui192) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CONSTANT_13]] : ui4] = %[[BITEXTRACT_34]] : ui32
+// CHECK:             %[[ADD_16:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_12]] : (ui4, si2) -> si6
+// CHECK:             %[[CAST_94:.*]] = hwarith.cast %[[ADD_16]] : (si6) -> ui5
+// CHECK:             %[[BITEXTRACT_35:.*]] = coredsl.bitextract %[[CAST_91]][127:96] : (ui192) -> ui32
+// CHECK:             %[[CAST_95:.*]] = coredsl.cast %[[BITEXTRACT_35]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_94]] : ui5] = %[[CAST_95]] : si32
+// CHECK:             %[[BITEXTRACT_36:.*]] = coredsl.bitextract %[[CAST_91]][159:128] : (ui192) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_94]] : ui5] = %[[BITEXTRACT_36]] : ui32
+// CHECK:             %[[BITEXTRACT_37:.*]] = coredsl.bitextract %[[CAST_91]][191:160] : (ui192) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_94]] : ui5] = %[[BITEXTRACT_37]] : ui32
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:           coredsl.instruction @MultipleReturnValues("0000000", %[[VAL_10:.*]] : ui5, "00000000000000000000"){
+// CHECK:             %[[CONSTANT_14:.*]] = hwarith.constant 1 : ui1
+// CHECK:             %[[CAST_96:.*]] = coredsl.cast %[[CONSTANT_14]] : ui1 to i1
+// CHECK:             %[[GET_66:.*]] = coredsl.get @STRUCT_REG_x : ui32
+// CHECK:             %[[GET_67:.*]] = coredsl.get @STRUCT_REG_y : ui32
+// CHECK:             %[[STRUCT_CREATE_0:.*]] = hw.struct_create (%[[GET_66]], %[[GET_67]]) : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[GET_68:.*]] = coredsl.get @OTHER_STRUCT_REG_x : ui32
+// CHECK:             %[[GET_69:.*]] = coredsl.get @OTHER_STRUCT_REG_y : ui32
+// CHECK:             %[[STRUCT_CREATE_1:.*]] = hw.struct_create (%[[GET_68]], %[[GET_69]]) : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[SELECT_0:.*]] = arith.select %[[CAST_96]], %[[STRUCT_CREATE_1]], %[[STRUCT_CREATE_0]] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[STRUCT_EXTRACT_2:.*]] = hw.struct_extract %[[SELECT_0]]["x"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_x = %[[STRUCT_EXTRACT_2]] : ui32
+// CHECK:             %[[STRUCT_EXTRACT_3:.*]] = hw.struct_extract %[[SELECT_0]]["y"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_y = %[[STRUCT_EXTRACT_3]] : ui32
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:         }

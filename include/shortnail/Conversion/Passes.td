@@ -74,6 +74,14 @@ def CoreDSLLegalizeCF : Pass<"coredsl-legalize-cf", "::mlir::coredsl::ISAXOp"> {
   ];
 }
 
+def CoreDSLExplodeStructRegisters : Pass<"coredsl-explode-struct-registers", "::mlir::coredsl::ISAXOp"> {
+  let summary = "Divide struct registers into multiple scalar registers";
+  let dependentDialects = [
+    "::mlir::coredsl::CoreDSLDialect",
+    "::circt::hw::HWDialect",
+  ];
+}
+
 def AnalyzeISAX : Pass<"analyze-isax", "mlir::ModuleOp"> {
   let summary = "Analyze CoreDSL ISAX MLIR and output structured YAML";
   let description = [{

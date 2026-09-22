@@ -98,6 +98,7 @@ def CoreDSL_Dialect : Dialect {
       "comb::CombDialect",
     ];
     let cppNamespace = "::mlir::coredsl";
+    let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//

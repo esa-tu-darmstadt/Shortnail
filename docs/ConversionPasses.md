@@ -15,6 +15,10 @@ The YAML is consumed by the Python patch generator (gen_patches.py).
 -output : Output path for the YAML analysis file
 ```
 
+### `-coredsl-explode-struct-registers`
+
+_Divide struct registers into multiple scalar registers_
+
 ### `-coredsl-legalize-cf`
 
 _Legalize cf operations by converting them to scf_
