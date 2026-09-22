@@ -10,6 +10,11 @@ coredsl.isax "StructRegisters" {
   coredsl.register local @STRUCT_REGS[32] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
   coredsl.register local @OTHER_STRUCT_REGS[16] : !hw.struct<aValue: si64, aStruct: !hw.struct<vec: !hw.struct<x: ui32, y: ui32>, notNested: si32>>
 
+  func.func @testWritingBlockArgument(%v : !hw.struct<x: ui32, y: ui32>) {
+    coredsl.set @STRUCT_REG = %v : !hw.struct<x: ui32, y: ui32>
+    return
+  }
+
   coredsl.instruction @StructRegDirectStore {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_imm_11_0", 11, 0, 0, "imm"]], [["%TREENAIL_WAS_HERE_rs1_4_0", 4, 0, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} (%TREENAIL_WAS_HERE_imm_11_0 : ui12, %TREENAIL_WAS_HERE_rs1_4_0 : ui5, "010", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "0000011") {
     %imm = coredsl.cast %TREENAIL_WAS_HERE_imm_11_0 : ui12 to ui12
     %rs1 = coredsl.cast %TREENAIL_WAS_HERE_rs1_4_0 : ui5 to ui5
@@ -119,6 +124,13 @@ coredsl.isax "StructRegisters" {
 // CHECK:           coredsl.register local @OTHER_STRUCT_REGS_aStruct_vec_x[16]  : ui32
 // CHECK:           coredsl.register local @OTHER_STRUCT_REGS_aStruct_vec_y[16]  : ui32
 // CHECK:           coredsl.register local @OTHER_STRUCT_REGS_aStruct_notNested[16]  : si32
+// CHECK:           func.func @testWritingBlockArgument(%[[VAL_0:.*]]: !hw.struct<x: ui32, y: ui32>) {
+// CHECK:             %[[STRUCT_EXTRACT_0:.*]] = hw.struct_extract %[[VAL_0]]["x"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_x = %[[STRUCT_EXTRACT_0]] : ui32
+// CHECK:             %[[STRUCT_EXTRACT_1:.*]] = hw.struct_extract %[[VAL_0]]["y"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_y = %[[STRUCT_EXTRACT_1]] : ui32
+// CHECK:             return
+// CHECK:           }
 // CHECK:           coredsl.instruction @StructRegDirectStore {lil.enc_immediates = {{\[\[}}["%[[VAL_0:.*]]", 11, 0, 0, "imm"]], {{\[\[}}"%[[VAL_1:.*]]", 4, 0, 0, "rs1"]], {{\[\[}}"%[[VAL_2:.*]]", 4, 0, 0, "rd"]]]}(%[[VAL_0]] : ui12, %[[VAL_1]] : ui5, "010", %[[VAL_2]] : ui5, "0000011"){
 // CHECK:             %[[CONSTANT_0:.*]] = hwarith.constant -1 : si32
 // CHECK:             %[[CONSTANT_1:.*]] = hwarith.constant 0 : ui1
