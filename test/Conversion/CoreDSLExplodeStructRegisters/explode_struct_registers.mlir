@@ -2,6 +2,7 @@
 
 coredsl.isax "StructRegisters" {
   coredsl.register local @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+  coredsl.register local @OTHER_STRUCT_REG : !hw.struct<x: ui32, y: ui32>
   coredsl.register local @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
   coredsl.register local @TRIPLE_NESTED_REG : !hw.struct<internalStruct: !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>, intVal: ui32>
   coredsl.register local @SCALAR_REG1 : ui32
@@ -82,11 +83,26 @@ coredsl.isax "StructRegisters" {
     coredsl.set @OTHER_STRUCT_REGS[%22 : ui4, 1:3] = %27 : ui480
     coredsl.end
   }
+  coredsl.instruction @MultipleReturnValues("0000000", %rs1 : ui5, "00000000000000000000") {
+    %c = hwarith.constant 1 : ui1
+    %b = coredsl.cast %c : ui1 to i1
+    %a = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %q = coredsl.get @OTHER_STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+    %r:2 = scf.if %b -> (!hw.struct<x: ui32, y: ui32>, !hw.struct<x: ui32, y: ui32>) {
+      scf.yield %a, %q : !hw.struct<x: ui32, y: ui32>, !hw.struct<x: ui32, y: ui32>
+    } else {
+      scf.yield %q, %a : !hw.struct<x: ui32, y: ui32>, !hw.struct<x: ui32, y: ui32>
+    }
+    coredsl.set @STRUCT_REG = %r#1 : !hw.struct<x: ui32, y: ui32>
+    coredsl.end
+  }
 }
 
 // CHECK-LABEL:   coredsl.isax "StructRegisters" {
 // CHECK:           coredsl.register local @STRUCT_REG_x  : ui32
 // CHECK:           coredsl.register local @STRUCT_REG_y  : ui32
+// CHECK:           coredsl.register local @OTHER_STRUCT_REG_x  : ui32
+// CHECK:           coredsl.register local @OTHER_STRUCT_REG_y  : ui32
 // CHECK:           coredsl.register local @NESTED_STRUCT_REG_notNested  : si32
 // CHECK:           coredsl.register local @NESTED_STRUCT_REG_vec_x  : ui32
 // CHECK:           coredsl.register local @NESTED_STRUCT_REG_vec_y  : ui32
@@ -331,6 +347,22 @@ coredsl.isax "StructRegisters" {
 // CHECK:             %[[BITEXTRACT_26:.*]] = coredsl.bitextract %[[CAST_52]][448:479] : (ui480) -> ui32
 // CHECK:             %[[CAST_61:.*]] = coredsl.cast %[[BITEXTRACT_26]] : ui32 to si32
 // CHECK:             coredsl.set @OTHER_STRUCT_REGS_aStruct_notNested{{\[}}%[[CAST_59]] : ui4] = %[[CAST_61]] : si32
+// CHECK:             coredsl.end
+// CHECK:           }
+// CHECK:           coredsl.instruction @MultipleReturnValues("0000000", %[[VAL_9:.*]] : ui5, "00000000000000000000"){
+// CHECK:             %[[CONSTANT_13:.*]] = hwarith.constant 1 : ui1
+// CHECK:             %[[CAST_62:.*]] = coredsl.cast %[[CONSTANT_13]] : ui1 to i1
+// CHECK:             %[[GET_51:.*]] = coredsl.get @STRUCT_REG_x : ui32
+// CHECK:             %[[GET_52:.*]] = coredsl.get @STRUCT_REG_y : ui32
+// CHECK:             %[[STRUCT_CREATE_0:.*]] = hw.struct_create (%[[GET_51]], %[[GET_52]]) : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[GET_53:.*]] = coredsl.get @OTHER_STRUCT_REG_x : ui32
+// CHECK:             %[[GET_54:.*]] = coredsl.get @OTHER_STRUCT_REG_y : ui32
+// CHECK:             %[[STRUCT_CREATE_1:.*]] = hw.struct_create (%[[GET_53]], %[[GET_54]]) : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[SELECT_0:.*]] = arith.select %[[CAST_62]], %[[STRUCT_CREATE_1]], %[[STRUCT_CREATE_0]] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[STRUCT_EXTRACT_0:.*]] = hw.struct_extract %[[SELECT_0]]["x"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_x = %[[STRUCT_EXTRACT_0]] : ui32
+// CHECK:             %[[STRUCT_EXTRACT_1:.*]] = hw.struct_extract %[[SELECT_0]]["y"] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             coredsl.set @STRUCT_REG_y = %[[STRUCT_EXTRACT_1]] : ui32
 // CHECK:             coredsl.end
 // CHECK:           }
 // CHECK:         }
