@@ -186,8 +186,8 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
                                                        IntegerType::Unsigned)
                                     : type;
                 auto extractedBits = coredsl::BitExtractOp::create(
-                    rewriter, loc, bitExtractResType, nullptr, bitsBeginAttr,
-                    bitsEndAttr, value);
+                    rewriter, loc, bitExtractResType, nullptr, bitsEndAttr,
+                    bitsBeginAttr, value);
                 Operation *valueToWrite = extractedBits;
                 if (bitExtractResType != type) {
                   valueToWrite = coredsl::CastOp::create(rewriter, loc, type,
