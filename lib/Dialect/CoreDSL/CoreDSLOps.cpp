@@ -19,6 +19,7 @@
 #include "mlir/IR/OpImplementation.h"
 
 using namespace circt::hwarith;
+using namespace circt;
 
 namespace mlir {
 namespace coredsl {
@@ -426,10 +427,42 @@ unsigned RegisterOp::getMaxIndexWidth() {
 unsigned RegisterOp::getMinIndexWidth() { return 0; }
 Type RegisterOp::getElementType() { return getRegType(); }
 
+static bool checkStructMembers(hw::StructType type) {
+  for (auto member : type.getElements()) {
+    auto structType = dyn_cast<hw::StructType>(member.type);
+    if (structType) {
+      if (!checkStructMembers(structType)) {
+        return false;
+      }
+    } else if (!isHWArithIntegerType(member.type)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 LogicalResult RegisterOp::verify() {
   // Regfield checks
   if (getNumElements() && getNumElements()->getZExtValue() == 0) {
     return emitError("register fields of size 0 are invalid");
+  }
+
+  if (isa<IntegerType>(getRegType())) {
+    if (!isHWArithIntegerType(getRegType())) {
+      return emitError("register type must be an arbitrary precision integer "
+                       "with signedness semantics");
+    }
+  } else {
+    auto structType = llvm::dyn_cast<hw::StructType>(getRegType());
+    if (!structType) {
+      return emitError("register type must be an arbitrary precision integer "
+                       "with signedness semantics, or a struct type");
+    }
+    if (!checkStructMembers(structType)) {
+      return emitError(
+          "struct type must only contain other struct types or arbitrary "
+          "precision integers with signedness semantics");
+    }
   }
 
   if (isa<IntegerType>(getRegType()) && !isHWArithIntegerType(getRegType())) {
