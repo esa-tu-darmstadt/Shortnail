@@ -94,6 +94,9 @@ coredsl.isax "StructRegisters" {
     // signed, causing invalid mlir to be emitted
     %29 = coredsl.get @STRUCT_REGS[%22 : ui4, 0:1] : ui192
     coredsl.set @STRUCT_REGS[%22 : ui4, 0:1] = %29 : ui192
+    // ranged access with to > from (big-endian)
+    %30 = coredsl.get @STRUCT_REGS[%22 : ui4, 5:3] : ui288
+    coredsl.set @STRUCT_REGS[%22 : ui4, 5:3] = %30 : ui288
     coredsl.end
   }
   coredsl.instruction @MultipleReturnValues("0000000", %rs1 : ui5, "00000000000000000000") {
@@ -435,18 +438,78 @@ coredsl.isax "StructRegisters" {
 // CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_48]] : ui5] = %[[BITEXTRACT_36]] : ui32
 // CHECK:             %[[BITEXTRACT_37:.*]] = coredsl.bitextract %[[CONCAT_37]][191:160] : (ui192) -> ui32
 // CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_48]] : ui5] = %[[BITEXTRACT_37]] : ui32
+// CHECK:             %[[ADD_17:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_10]] : (ui4, si3) -> si6
+// CHECK:             %[[CAST_50:.*]] = hwarith.cast %[[ADD_17]] : (si6) -> ui5
+// CHECK:             %[[GET_66:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_50]] : ui5] : si32
+// CHECK:             %[[GET_67:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_50]] : ui5] : ui32
+// CHECK:             %[[GET_68:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_50]] : ui5] : ui32
+// CHECK:             %[[ADD_18:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_9]] : (ui4, si4) -> si6
+// CHECK:             %[[CAST_51:.*]] = hwarith.cast %[[ADD_18]] : (si6) -> ui5
+// CHECK:             %[[GET_69:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_51]] : ui5] : si32
+// CHECK:             %[[GET_70:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_51]] : ui5] : ui32
+// CHECK:             %[[GET_71:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_51]] : ui5] : ui32
+// CHECK:             %[[ADD_19:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_8]] : (ui4, si4) -> si6
+// CHECK:             %[[CAST_52:.*]] = hwarith.cast %[[ADD_19]] : (si6) -> ui5
+// CHECK:             %[[GET_72:.*]] = coredsl.get @STRUCT_REGS_notNested{{\[}}%[[CAST_52]] : ui5] : si32
+// CHECK:             %[[GET_73:.*]] = coredsl.get @STRUCT_REGS_vec_x{{\[}}%[[CAST_52]] : ui5] : ui32
+// CHECK:             %[[GET_74:.*]] = coredsl.get @STRUCT_REGS_vec_y{{\[}}%[[CAST_52]] : ui5] : ui32
+// CHECK:             %[[CONCAT_38:.*]] = coredsl.concat %[[GET_66]], %[[GET_67]] : si32, ui32
+// CHECK:             %[[CONCAT_39:.*]] = coredsl.concat %[[CONCAT_38]], %[[GET_68]] : ui64, ui32
+// CHECK:             %[[CONCAT_40:.*]] = coredsl.concat %[[CONCAT_39]], %[[GET_69]] : ui96, si32
+// CHECK:             %[[CONCAT_41:.*]] = coredsl.concat %[[CONCAT_40]], %[[GET_70]] : ui128, ui32
+// CHECK:             %[[CONCAT_42:.*]] = coredsl.concat %[[CONCAT_41]], %[[GET_71]] : ui160, ui32
+// CHECK:             %[[CONCAT_43:.*]] = coredsl.concat %[[CONCAT_42]], %[[GET_72]] : ui192, si32
+// CHECK:             %[[CONCAT_44:.*]] = coredsl.concat %[[CONCAT_43]], %[[GET_73]] : ui224, ui32
+// CHECK:             %[[CONCAT_45:.*]] = coredsl.concat %[[CONCAT_44]], %[[GET_74]] : ui256, ui32
+// CHECK:             %[[CAST_53:.*]] = coredsl.cast %[[CONCAT_45]] : ui288 to ui96
+// CHECK:             %[[BITEXTRACT_38:.*]] = coredsl.bitextract %[[CONCAT_45]][191:96] : (ui288) -> ui96
+// CHECK:             %[[BITEXTRACT_39:.*]] = coredsl.bitextract %[[CONCAT_45]][287:192] : (ui288) -> ui96
+// CHECK:             %[[CONCAT_46:.*]] = coredsl.concat %[[BITEXTRACT_39]], %[[BITEXTRACT_38]] : ui96, ui96
+// CHECK:             %[[CONCAT_47:.*]] = coredsl.concat %[[CONCAT_46]], %[[CAST_53]] : ui192, ui96
+// CHECK:             %[[CAST_54:.*]] = coredsl.cast %[[CONCAT_47]] : ui288 to ui96
+// CHECK:             %[[BITEXTRACT_40:.*]] = coredsl.bitextract %[[CONCAT_47]][191:96] : (ui288) -> ui96
+// CHECK:             %[[BITEXTRACT_41:.*]] = coredsl.bitextract %[[CONCAT_47]][287:192] : (ui288) -> ui96
+// CHECK:             %[[CONCAT_48:.*]] = coredsl.concat %[[BITEXTRACT_41]], %[[BITEXTRACT_40]] : ui96, ui96
+// CHECK:             %[[CONCAT_49:.*]] = coredsl.concat %[[CONCAT_48]], %[[CAST_54]] : ui192, ui96
+// CHECK:             %[[ADD_20:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_10]] : (ui4, si3) -> si6
+// CHECK:             %[[CAST_55:.*]] = hwarith.cast %[[ADD_20]] : (si6) -> ui5
+// CHECK:             %[[CAST_56:.*]] = coredsl.cast %[[CONCAT_49]] : ui288 to ui32
+// CHECK:             %[[CAST_57:.*]] = coredsl.cast %[[CAST_56]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_55]] : ui5] = %[[CAST_57]] : si32
+// CHECK:             %[[BITEXTRACT_42:.*]] = coredsl.bitextract %[[CONCAT_49]][63:32] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_55]] : ui5] = %[[BITEXTRACT_42]] : ui32
+// CHECK:             %[[BITEXTRACT_43:.*]] = coredsl.bitextract %[[CONCAT_49]][95:64] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_55]] : ui5] = %[[BITEXTRACT_43]] : ui32
+// CHECK:             %[[ADD_21:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_9]] : (ui4, si4) -> si6
+// CHECK:             %[[CAST_58:.*]] = hwarith.cast %[[ADD_21]] : (si6) -> ui5
+// CHECK:             %[[BITEXTRACT_44:.*]] = coredsl.bitextract %[[CONCAT_49]][127:96] : (ui288) -> ui32
+// CHECK:             %[[CAST_59:.*]] = coredsl.cast %[[BITEXTRACT_44]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_58]] : ui5] = %[[CAST_59]] : si32
+// CHECK:             %[[BITEXTRACT_45:.*]] = coredsl.bitextract %[[CONCAT_49]][159:128] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_58]] : ui5] = %[[BITEXTRACT_45]] : ui32
+// CHECK:             %[[BITEXTRACT_46:.*]] = coredsl.bitextract %[[CONCAT_49]][191:160] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_58]] : ui5] = %[[BITEXTRACT_46]] : ui32
+// CHECK:             %[[ADD_22:.*]] = hwarith.add %[[CONSTANT_13]], %[[CONSTANT_8]] : (ui4, si4) -> si6
+// CHECK:             %[[CAST_60:.*]] = hwarith.cast %[[ADD_22]] : (si6) -> ui5
+// CHECK:             %[[BITEXTRACT_47:.*]] = coredsl.bitextract %[[CONCAT_49]][223:192] : (ui288) -> ui32
+// CHECK:             %[[CAST_61:.*]] = coredsl.cast %[[BITEXTRACT_47]] : ui32 to si32
+// CHECK:             coredsl.set @STRUCT_REGS_notNested{{\[}}%[[CAST_60]] : ui5] = %[[CAST_61]] : si32
+// CHECK:             %[[BITEXTRACT_48:.*]] = coredsl.bitextract %[[CONCAT_49]][255:224] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_x{{\[}}%[[CAST_60]] : ui5] = %[[BITEXTRACT_48]] : ui32
+// CHECK:             %[[BITEXTRACT_49:.*]] = coredsl.bitextract %[[CONCAT_49]][287:256] : (ui288) -> ui32
+// CHECK:             coredsl.set @STRUCT_REGS_vec_y{{\[}}%[[CAST_60]] : ui5] = %[[BITEXTRACT_49]] : ui32
 // CHECK:             coredsl.end
 // CHECK:           }
 // CHECK:           coredsl.instruction @MultipleReturnValues("0000000", %[[VAL_10:.*]] : ui5, "00000000000000000000"){
 // CHECK:             %[[CONSTANT_14:.*]] = hwarith.constant 1 : ui1
-// CHECK:             %[[CAST_50:.*]] = coredsl.cast %[[CONSTANT_14]] : ui1 to i1
-// CHECK:             %[[GET_66:.*]] = coredsl.get @STRUCT_REG_x : ui32
-// CHECK:             %[[GET_67:.*]] = coredsl.get @STRUCT_REG_y : ui32
-// CHECK:             %[[STRUCT_CREATE_0:.*]] = hw.struct_create (%[[GET_66]], %[[GET_67]]) : !hw.struct<x: ui32, y: ui32>
-// CHECK:             %[[GET_68:.*]] = coredsl.get @OTHER_STRUCT_REG_x : ui32
-// CHECK:             %[[GET_69:.*]] = coredsl.get @OTHER_STRUCT_REG_y : ui32
-// CHECK:             %[[STRUCT_CREATE_1:.*]] = hw.struct_create (%[[GET_68]], %[[GET_69]]) : !hw.struct<x: ui32, y: ui32>
-// CHECK:             %[[SELECT_0:.*]] = arith.select %[[CAST_50]], %[[STRUCT_CREATE_1]], %[[STRUCT_CREATE_0]] : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[CAST_62:.*]] = coredsl.cast %[[CONSTANT_14]] : ui1 to i1
+// CHECK:             %[[GET_75:.*]] = coredsl.get @STRUCT_REG_x : ui32
+// CHECK:             %[[GET_76:.*]] = coredsl.get @STRUCT_REG_y : ui32
+// CHECK:             %[[STRUCT_CREATE_0:.*]] = hw.struct_create (%[[GET_75]], %[[GET_76]]) : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[GET_77:.*]] = coredsl.get @OTHER_STRUCT_REG_x : ui32
+// CHECK:             %[[GET_78:.*]] = coredsl.get @OTHER_STRUCT_REG_y : ui32
+// CHECK:             %[[STRUCT_CREATE_1:.*]] = hw.struct_create (%[[GET_77]], %[[GET_78]]) : !hw.struct<x: ui32, y: ui32>
+// CHECK:             %[[SELECT_0:.*]] = arith.select %[[CAST_62]], %[[STRUCT_CREATE_1]], %[[STRUCT_CREATE_0]] : !hw.struct<x: ui32, y: ui32>
 // CHECK:             %[[STRUCT_EXTRACT_2:.*]] = hw.struct_extract %[[SELECT_0]]["x"] : !hw.struct<x: ui32, y: ui32>
 // CHECK:             coredsl.set @STRUCT_REG_x = %[[STRUCT_EXTRACT_2]] : ui32
 // CHECK:             %[[STRUCT_EXTRACT_3:.*]] = hw.struct_extract %[[SELECT_0]]["y"] : !hw.struct<x: ui32, y: ui32>
