@@ -208,7 +208,6 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         const int64_t minIdx = std::min(from.getInt(), to.getInt());
         const int64_t maxIdx = std::max(from.getInt(), to.getInt());
         if (minIdx == to.getInt()) {
-          // TODO: can I just deref this?
           const int64_t structSize = *structType.getBitWidth();
           value = reverseWordOrder(rewriter, value, loc, structSize);
         }
@@ -327,7 +326,6 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         }
         auto result = concatenateValues(rewriter, loc, toConcatenate);
         if (minIdx == to.getInt()) {
-          // TODO: can I just deref this?
           const int64_t structSize = *structType.getBitWidth();
           result = reverseWordOrder(rewriter, result, loc, structSize);
         }
