@@ -135,6 +135,44 @@ static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
   return hwarith::CastOp::create(rewriter, loc, idxType, index->getResult(0));
 }
 
+static Value concatenateValues(ConversionPatternRewriter &rewriter,
+                               Location loc, const SmallVector<Value> &vals) {
+  Value currentValue = vals[0];
+  for (size_t i = 1, end = vals.size(); i < end; ++i) {
+    currentValue =
+        coredsl::ConcatOp::create(rewriter, loc, currentValue, vals[i]);
+  }
+  return currentValue;
+}
+
+static void extractWords(ConversionPatternRewriter &rewriter, Value input,
+                         Location loc, SmallVector<Value> &output,
+                         unsigned wordWidth) {
+  assert(input.getType().isInteger());
+  IntegerType type = llvm::cast<IntegerType>(input.getType());
+  MLIRContext *ctx = rewriter.getContext();
+  const unsigned width = type.getWidth();
+  assert(width % wordWidth == 0);
+  auto byteType = IntegerType::get(ctx, wordWidth, IntegerType::Unsigned);
+  auto idxType = IndexType::get(ctx);
+  for (unsigned i = 0; i < width; i += wordWidth) {
+    const auto bitsBeginAttr = IntegerAttr::get(idxType, i);
+    const auto bitsEndAttr = IntegerAttr::get(idxType, i + wordWidth - 1);
+    auto extractOp = coredsl::BitExtractOp::create(
+        rewriter, loc, byteType, nullptr, bitsEndAttr, bitsBeginAttr, input);
+    output.push_back(extractOp);
+  }
+}
+
+static Value reverseWordOrder(ConversionPatternRewriter &rewriter, Value input,
+                              Location loc, unsigned wordWidth) {
+  SmallVector<Value> valsToConcat;
+  extractWords(rewriter, input, loc, valsToConcat, wordWidth);
+  std::reverse(valsToConcat.begin(), valsToConcat.end());
+  auto value = concatenateValues(rewriter, loc, valsToConcat);
+  return hwarith::CastOp::create(rewriter, loc, input.getType(), value);
+}
+
 struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
   const llvm::StringMap<hw::StructType> &symNameToType;
   const llvm::StringMap<unsigned> &symNameToMaxIndexWidth;
@@ -167,8 +205,14 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
         size_t currBitPos = 0;
         const unsigned maxIndexWidth =
             symNameToMaxIndexWidth.find(symbolName)->second;
-        assert(from.getInt() <= to.getInt());
-        for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
+        const int64_t minIdx = std::min(from.getInt(), to.getInt());
+        const int64_t maxIdx = std::max(from.getInt(), to.getInt());
+        if (minIdx == to.getInt()) {
+          // TODO: can I just deref this?
+          const int64_t structSize = *structType.getBitWidth();
+          value = reverseWordOrder(rewriter, value, loc, structSize);
+        }
+        for (int64_t i = minIdx; i <= maxIdx; ++i) {
           auto idxVal =
               emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
           traverseStructReg(
@@ -188,13 +232,13 @@ struct StructRewriteSetOps : public OpConversionPattern<coredsl::SetOp> {
                 auto extractedBits = coredsl::BitExtractOp::create(
                     rewriter, loc, bitExtractResType, nullptr, bitsEndAttr,
                     bitsBeginAttr, value);
-                Operation *valueToWrite = extractedBits;
+                Value valueToWrite = extractedBits->getResult(0);
                 if (bitExtractResType != type) {
                   valueToWrite = coredsl::CastOp::create(rewriter, loc, type,
-                                                         extractedBits);
+                                                         valueToWrite);
                 }
                 coredsl::SetOp::create(rewriter, loc, idxVal, nullptr, nullptr,
-                                       newRegName, valueToWrite->getResult(0));
+                                       newRegName, valueToWrite);
                 currBitPos += type.getWidth();
               });
         }
@@ -266,29 +310,27 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
         SmallVector<Value> toConcatenate;
         const unsigned maxIndexWidth =
             symNameToMaxIndexWidth.find(symbolName)->second;
-        assert(from.getInt() <= to.getInt());
-        for (int64_t i = from.getInt(); i <= to.getInt(); ++i) {
+        const int64_t minIdx = std::min(from.getInt(), to.getInt());
+        const int64_t maxIdx = std::max(from.getInt(), to.getInt());
+        for (int64_t i = minIdx; i <= maxIdx; ++i) {
           auto newBase =
               emitTruncatedOffset(rewriter, ctx, base, i, maxIndexWidth, loc);
           traverseStructReg(
               symbolName, structType,
-              [&rewriter, &loc, &newBase, &toConcatenate,
-               ctx](StringRef newRegName, StringAttr fieldName,
-                    IntegerType type) {
+              [&rewriter, &loc, &newBase, &toConcatenate](StringRef newRegName,
+                                                          StringAttr fieldName,
+                                                          IntegerType type) {
                 auto gotValue = coredsl::GetOp::create(
                     rewriter, loc, type, newBase, nullptr, nullptr, newRegName);
-                auto gotType = cast<IntegerType>(gotValue.getType());
-                Operation *result = gotValue;
-                if (gotType.getSignedness() != IntegerType::Signless) {
-                  auto signlessType = IntegerType::get(ctx, gotType.getWidth(),
-                                                       IntegerType::Signless);
-                  result = hwarith::CastOp::create(rewriter, loc, signlessType,
-                                                   gotValue);
-                }
-                toConcatenate.push_back(result->getResult(0));
+                toConcatenate.push_back(gotValue);
               });
         }
-        auto result = comb::ConcatOp::create(rewriter, loc, toConcatenate);
+        auto result = concatenateValues(rewriter, loc, toConcatenate);
+        if (minIdx == to.getInt()) {
+          // TODO: can I just deref this?
+          const int64_t structSize = *structType.getBitWidth();
+          result = reverseWordOrder(rewriter, result, loc, structSize);
+        }
         IntegerType resultSignlessType = cast<IntegerType>(result.getType());
         auto resultCast = hwarith::CastOp::create(
             rewriter, loc,
