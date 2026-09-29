@@ -26,7 +26,7 @@ struct MemInfo {
   uint64_t size;
   unsigned maxIdxWidth;
   unsigned minIdxWidth;
-  IntegerType elementType;
+  Type elementType;
   bool isConst;
   bool isVolatile;
 };

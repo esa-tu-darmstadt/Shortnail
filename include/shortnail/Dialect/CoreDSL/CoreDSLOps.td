@@ -332,7 +332,7 @@ class CoreDSL_AccessOp<string mnemonic, string lhsAssemblyFormat, string rhsAsse
 
 def CoreDSL_GetOp : CoreDSL_AccessOp<"get", "$sym", "`:` type($result) attr-dict",
                                     (ins FlatSymbolRefAttr:$sym), 
-                                    (outs HWArithIntegerType:$result),
+                                    (outs AnyType:$result),
                                     /*extraClassDecls=*/"Operation* resolveSymbol(); std::optional<MemInfo> getMemInfo();",
                                     /*isRangeAccessOptional=*/"true"> {
   let summary = "Reads from architectural state.";
@@ -358,7 +358,7 @@ def CoreDSL_GetOp : CoreDSL_AccessOp<"get", "$sym", "`:` type($result) attr-dict
 }
 
 def CoreDSL_SetOp : CoreDSL_AccessOp<"set", "$sym", "`=` $value `:` type($value) attr-dict",
-                                    (ins FlatSymbolRefAttr:$sym, HWArithIntegerType:$value), 
+                                    (ins FlatSymbolRefAttr:$sym, AnyType:$value),
                                     (outs), /*extraClassDecls=*/"Operation* resolveSymbol(); std::optional<MemInfo> getMemInfo();",
                                     /*isRangeAccessOptional=*/"true", [],
                                     /*folderPrototype=*/"LogicalResult $cppClass::fold(FoldAdaptor adaptor, SmallVectorImpl<OpFoldResult> &results)",
