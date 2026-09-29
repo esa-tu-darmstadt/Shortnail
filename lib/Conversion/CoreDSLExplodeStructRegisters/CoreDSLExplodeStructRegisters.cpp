@@ -329,13 +329,7 @@ struct StructRewriteGetOps : public OpConversionPattern<coredsl::GetOp> {
           const int64_t structSize = *structType.getBitWidth();
           result = reverseWordOrder(rewriter, result, loc, structSize);
         }
-        IntegerType resultSignlessType = cast<IntegerType>(result.getType());
-        auto resultCast = hwarith::CastOp::create(
-            rewriter, loc,
-            IntegerType::get(ctx, resultSignlessType.getWidth(),
-                             IntegerType::Unsigned),
-            result);
-        replacement = resultCast.getResult();
+        replacement = result;
       } else {
         // Single element access: Read the scalar values and bundle them into a
         // struct
