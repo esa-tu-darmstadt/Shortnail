@@ -116,6 +116,7 @@ coredsl.isax "StructRegisters" {
     coredsl.end
   }
 }
+
 // CHECK-LABEL:   coredsl.isax "StructRegisters" {
 // CHECK:           coredsl.register local @STRUCT_REG_x  : ui32
 // CHECK:           coredsl.register local @STRUCT_REG_y  : ui32
