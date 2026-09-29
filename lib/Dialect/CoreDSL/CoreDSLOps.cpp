@@ -465,11 +465,6 @@ LogicalResult RegisterOp::verify() {
     }
   }
 
-  if (isa<IntegerType>(getRegType()) && !isHWArithIntegerType(getRegType())) {
-    return emitError("register type must be an arbitrary precision integer "
-                     "with signedness semantics");
-  }
-
   // Initializer checks
   if (ElementsAttr initializer = getInitializerAttr()) {
     if (initializer.getNumElements() != static_cast<int64_t>(getSize()))
