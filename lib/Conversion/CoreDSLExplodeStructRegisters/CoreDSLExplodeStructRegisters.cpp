@@ -113,7 +113,7 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
 static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
                                  MLIRContext *ctx, Value base, int64_t offset,
                                  unsigned maxIndexWidth, Location loc) {
-  if (offset == 0) {
+  if (offset == 0 && base != nullptr) {
     // We don't need to insert a cast here, because if base is larger than
     // maxIndexWidth, the original op was not valid in the first place
     return base;
