@@ -108,6 +108,20 @@ struct StructExploderPattern : public OpConversionPattern<coredsl::RegisterOp> {
   }
 };
 
+static IntegerType getMinIntegerType(MLIRContext *ctx, int64_t value) {
+  auto signedness = IntegerType::Unsigned;
+  // llvm::bit_width is for unsigned integers only, so check how many bits
+  // are necessary for the positive value and then add one for the sign bit
+  if (value < 0) {
+    value = -value;
+    signedness = IntegerType::Signed;
+  }
+  int bitWidth = llvm::bit_width(static_cast<uint64_t>(value)) +
+                 (signedness == IntegerType::Signed);
+  bitWidth = std::max(1, bitWidth);
+  return IntegerType::get(ctx, bitWidth, signedness);
+}
+
 // Emits add of base to offset, truncating to maxIndexWidth if the result type
 // is larger
 static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
@@ -118,9 +132,7 @@ static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
     // maxIndexWidth, the original op was not valid in the first place
     return base;
   }
-  const auto offsetType =
-      IntegerType::get(ctx, llvm::bit_width(static_cast<uint64_t>(offset)) + 1,
-                       IntegerType::Signed);
+  const auto offsetType = getMinIntegerType(ctx, offset);
   const auto offsetAttr = IntegerAttr::get(offsetType, offset);
   auto offsetConstant = hwarith::ConstantOp::create(
       rewriter, loc, offsetAttr.getType(), offsetAttr);
@@ -128,11 +140,14 @@ static Value emitTruncatedOffset(ConversionPatternRewriter &rewriter,
   if (base != nullptr) {
     index = hwarith::AddOp::create(rewriter, loc, {base, offsetConstant});
   }
-  const unsigned indexWidth =
-      index->getResult(0).getType().getIntOrFloatBitWidth();
+  auto indexType = index->getResult(0).getType();
+  const unsigned indexWidth = indexType.getIntOrFloatBitWidth();
   const unsigned neededWidth = std::min(indexWidth, maxIndexWidth);
-  auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
-  return hwarith::CastOp::create(rewriter, loc, idxType, index->getResult(0));
+  if (indexWidth > neededWidth || indexType.isSignedInteger()) {
+    auto idxType = IntegerType::get(ctx, neededWidth, IntegerType::Unsigned);
+    return hwarith::CastOp::create(rewriter, loc, idxType, index->getResult(0));
+  }
+  return index->getResult(0);
 }
 
 static Value concatenateValues(ConversionPatternRewriter &rewriter,
