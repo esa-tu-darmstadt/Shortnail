@@ -43,7 +43,7 @@ def GetSetOpInterface : OpInterface<"GetSetOpInterface"> {
     InterfaceMethod<
         "Get the minimal required index width.", "unsigned", "getMinIndexWidth">,
     InterfaceMethod<
-        "Get the underlying element type of the memory.", "::mlir::IntegerType",
+        "Get the underlying element type of the memory.", "::mlir::Type",
         "getElementType">
   ];
 }

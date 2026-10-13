@@ -10,6 +10,7 @@
 #include "shortnail/Dialect/CoreDSL/CoreDSLDialect.h"
 #include "shortnail/Dialect/CoreDSL/CoreDSLDirectives.h"
 
+#include "circt/Dialect/HW/HWOps.h"
 #include "circt/Dialect/HWArith/HWArithOps.h"
 #include "circt/Dialect/HWArith/HWArithTypes.h"
 
@@ -18,6 +19,7 @@
 #include "mlir/IR/OpImplementation.h"
 
 using namespace circt::hwarith;
+using namespace circt;
 
 namespace mlir {
 namespace coredsl {
@@ -384,9 +386,7 @@ unsigned AddressSpaceOp::getMinIndexWidth() {
   // TODO restrict to the address width?
   // return getAddrType()->getIntOrFloatBitWidth();
 }
-IntegerType AddressSpaceOp::getElementType() {
-  return cast<IntegerType>(getResType());
-}
+Type AddressSpaceOp::getElementType() { return getResType(); }
 
 //===----------------------------------------------------------------------===//
 // RegisterOp
@@ -425,8 +425,20 @@ unsigned RegisterOp::getMaxIndexWidth() {
   return llvm::Log2_64_Ceil(getSize());
 }
 unsigned RegisterOp::getMinIndexWidth() { return 0; }
-IntegerType RegisterOp::getElementType() {
-  return cast<IntegerType>(getRegType());
+Type RegisterOp::getElementType() { return getRegType(); }
+
+static bool checkStructMembers(hw::StructType type) {
+  for (auto member : type.getElements()) {
+    auto structType = dyn_cast<hw::StructType>(member.type);
+    if (structType) {
+      if (!checkStructMembers(structType)) {
+        return false;
+      }
+    } else if (!isHWArithIntegerType(member.type)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 LogicalResult RegisterOp::verify() {
@@ -435,9 +447,22 @@ LogicalResult RegisterOp::verify() {
     return emitError("register fields of size 0 are invalid");
   }
 
-  if (!isHWArithIntegerType(getRegType())) {
-    return emitError("register type must be an arbitrary precision integer "
-                     "with signedness semantics");
+  if (isa<IntegerType>(getRegType())) {
+    if (!isHWArithIntegerType(getRegType())) {
+      return emitError("register type must be an arbitrary precision integer "
+                       "with signedness semantics");
+    }
+  } else {
+    auto structType = llvm::dyn_cast<hw::StructType>(getRegType());
+    if (!structType) {
+      return emitError("register type must be an arbitrary precision integer "
+                       "with signedness semantics, or a struct type");
+    }
+    if (!checkStructMembers(structType)) {
+      return emitError(
+          "struct type must only contain other struct types or arbitrary "
+          "precision integers with signedness semantics");
+    }
   }
 
   // Initializer checks
@@ -703,11 +728,27 @@ LogicalResult ConcatOp::inferReturnTypes(
 template <typename AccessOpTy>
 static LogicalResult checkAccess(AccessOpTy op, Type requiredType) {
   if (auto info = op.getMemInfo()) {
+    Type expectedType;
+    if (auto intType = dyn_cast<IntegerType>(info->elementType)) {
+      expectedType = IntegerType::get(op.getContext(),
+                                      intType.getWidth() * op.getAccessWidth(),
+                                      intType.getSignedness());
+    } else if (auto structType =
+                   dyn_cast<circt::hw::StructType>(info->elementType)) {
+      if (op.getAccessWidth() == 1) {
+        expectedType = structType;
+      } else {
+        // The structs get converted to integers with ranged accesses
+        expectedType = IntegerType::get(op.getContext(),
+                                        circt::hw::getBitWidth(structType) *
+                                            op.getAccessWidth(),
+                                        IntegerType::Unsigned);
+      }
+    } else {
+      llvm_unreachable("Unexpected type");
+    }
     // Calculate the expected type: element type width * access width while
     // keeping the signedness
-    Type expectedType = IntegerType::get(
-        op.getContext(), info->elementType.getWidth() * op.getAccessWidth(),
-        info->elementType.getSignedness());
     if (expectedType != requiredType) {
       return op.emitError("type mismatch, referencing storage of type ")
              << info->elementType << " with access width of "
