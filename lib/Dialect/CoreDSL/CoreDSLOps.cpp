@@ -917,6 +917,22 @@ GetSetOpInterface AliasOp::resolveSymbol() {
   return lookupSymbolInModule<GetSetOpInterface>(*this, getRef());
 }
 
+static GetSetOpInterface
+resolveRegisterOrAddrSpaceReference(Operation *op, int64_t &startOffset) {
+  if (auto regOp = dyn_cast<RegisterOp>(op)) {
+    return regOp;
+  }
+  if (auto addrSpaceOp = dyn_cast<AddressSpaceOp>(op)) {
+    return addrSpaceOp;
+  }
+  if (auto alias = dyn_cast<AliasOp>(op)) {
+    startOffset += alias.getRangeStart();
+    auto resolved = genericResolveSymbol(alias, alias.getRef());
+    return resolveRegisterOrAddrSpaceReference(resolved, startOffset);
+  }
+  return nullptr;
+}
+
 LogicalResult AliasOp::verify() {
   if (auto from = getFrom()) {
     if (auto to = getTo()) {
@@ -927,8 +943,16 @@ LogicalResult AliasOp::verify() {
     }
   }
 
-  if (auto resolvedSym = resolveSymbol()) {
-    auto maxIdxBitWidth = resolvedSym.getMaxIndexWidth();
+  if (auto resolvedSym = genericResolveSymbol(*this, getRef())) {
+    GetSetOpInterface fullyResolved = nullptr;
+    int64_t startOffset = 0;
+    if (auto alias = dyn_cast<AliasOp>(resolvedSym)) {
+      fullyResolved =
+          resolveRegisterOrAddrSpaceReference(resolvedSym, startOffset);
+    } else {
+      fullyResolved = dyn_cast<GetSetOpInterface>(resolvedSym);
+    }
+    auto maxIdxBitWidth = fullyResolved.getMaxIndexWidth();
     bool isIndexable = maxIdxBitWidth > 0;
     auto aliasRange = getAliasRange();
 
@@ -942,7 +966,7 @@ LogicalResult AliasOp::verify() {
       }
     }
 
-    auto memSize = resolvedSym.getMemSize();
+    auto memSize = fullyResolved.getMemSize();
 
     if (auto from = getFrom()) {
       auto reqBitWidth = getAPIntBitWidth(from.value(), false);
@@ -954,7 +978,7 @@ LogicalResult AliasOp::verify() {
     }
 
     auto rangeStart = getRangeStart();
-    if (memSize != 0 && rangeStart + aliasRange > memSize) {
+    if (memSize != 0 && rangeStart + aliasRange + startOffset > memSize) {
       return emitError("the specified alias range exceeds the underlying size "
                        "of the 'coredsl.register' or 'coredsl.addrspace'");
     }
