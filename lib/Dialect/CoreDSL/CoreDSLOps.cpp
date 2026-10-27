@@ -913,10 +913,6 @@ std::optional<MemInfo> AliasOp::getMemInfo() {
   return info;
 }
 
-GetSetOpInterface AliasOp::resolveSymbol() {
-  return lookupSymbolInModule<GetSetOpInterface>(*this, getRef());
-}
-
 static GetSetOpInterface
 resolveRegisterOrAddrSpaceReference(Operation *op, int64_t &startOffset) {
   if (auto regOp = dyn_cast<RegisterOp>(op)) {
@@ -931,6 +927,16 @@ resolveRegisterOrAddrSpaceReference(Operation *op, int64_t &startOffset) {
     return resolveRegisterOrAddrSpaceReference(resolved, startOffset);
   }
   return nullptr;
+}
+
+// TODO: does this break some other behaviour?
+// - Anything with a reference to a non-reference should behave the same
+// - What is the expected behaviour for a reference to a reference?
+// - This fixes crashes in getMemInfo(), but we could also just modify
+// getMemInfo
+GetSetOpInterface AliasOp::resolveSymbol() {
+  int64_t startOffset = 0;
+  return resolveRegisterOrAddrSpaceReference(getOperation(), startOffset);
 }
 
 LogicalResult AliasOp::verify() {
