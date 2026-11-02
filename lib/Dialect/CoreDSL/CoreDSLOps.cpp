@@ -797,14 +797,26 @@ static Operation *genericResolveSymbol(Operation *op, StringRef sym) {
   return lookupSymbolInModule<GetSetOpInterface>(op, sym);
 }
 
-static RegisterOp fullyResolveReference(Operation *op, int64_t &startOffset) {
-  if (auto regOp = dyn_cast<RegisterOp>(op))
+static GetSetOpInterface
+resolveRegisterOrAddrSpaceReference(Operation *op, int64_t &startOffset) {
+  if (auto regOp = dyn_cast<RegisterOp>(op)) {
     return regOp;
-  if (isa<AliasOp>(op)) {
-    auto alias = cast<AliasOp>(op);
+  }
+  if (auto addrSpaceOp = dyn_cast<AddressSpaceOp>(op)) {
+    return addrSpaceOp;
+  }
+  if (auto alias = dyn_cast<AliasOp>(op)) {
     startOffset += alias.getRangeStart();
-    return fullyResolveReference(genericResolveSymbol(alias, alias.getRef()),
-                                 startOffset);
+    auto resolved = genericResolveSymbol(alias, alias.getRef());
+    return resolveRegisterOrAddrSpaceReference(resolved, startOffset);
+  }
+  return nullptr;
+}
+
+static RegisterOp fullyResolveReference(Operation *op, int64_t &startOffset) {
+  GetSetOpInterface result = resolveRegisterOrAddrSpaceReference(op, startOffset);
+  if (auto registerOp = dyn_cast<RegisterOp>(&result)) {
+    return *registerOp;
   }
   return nullptr;
 }
@@ -911,23 +923,6 @@ std::optional<MemInfo> AliasOp::getMemInfo() {
   info.minIdxWidth = 0;
   info.elementType = resolveSymbol().getElementType();
   return info;
-}
-
-// TODO: this is almost identical to fullyResolveReference
-static GetSetOpInterface
-resolveRegisterOrAddrSpaceReference(Operation *op, int64_t &startOffset) {
-  if (auto regOp = dyn_cast<RegisterOp>(op)) {
-    return regOp;
-  }
-  if (auto addrSpaceOp = dyn_cast<AddressSpaceOp>(op)) {
-    return addrSpaceOp;
-  }
-  if (auto alias = dyn_cast<AliasOp>(op)) {
-    startOffset += alias.getRangeStart();
-    auto resolved = genericResolveSymbol(alias, alias.getRef());
-    return resolveRegisterOrAddrSpaceReference(resolved, startOffset);
-  }
-  return nullptr;
 }
 
 // TODO: does this break some other behaviour?
