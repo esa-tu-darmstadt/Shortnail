@@ -31,6 +31,11 @@ stdenv.mkDerivation {
     "-DLLVM_ENABLE_BINDINGS=OFF"
     "-DLLVM_ENABLE_OCAMLDOC=OFF"
     "-DLLVM_BUILD_EXAMPLES=OFF"
+    # The bundled google-benchmark builds with -pedantic-errors, which turns
+    # the _LIBCPP_HARDENING_MODE redefinition (LLVM_ENABLE_ASSERTIONS vs. the
+    # compiler wrapper's default hardening) into an error. Nothing here needs
+    # the benchmarks.
+    "-DLLVM_INCLUDE_BENCHMARKS=OFF"
     "-DLLVM_OPTIMIZED_TABLEGEN=ON"
     "-DLLVM_ENABLE_PROJECTS=mlir"
     "-DLLVM_TARGETS_TO_BUILD=Native"
