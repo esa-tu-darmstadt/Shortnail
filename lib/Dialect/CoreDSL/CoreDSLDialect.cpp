@@ -91,11 +91,13 @@ void CoreDSLDialect::initialize() {
 
 namespace {
 
-// This pattern is necessary because the canonicalizer will emit hw.constant ops
-// when invoked by the inliner. It does not check if an integer is actually of a
-// signless type, which causes the patterns invoked by the canonicalizer to fail
-// The error happens when the canonicalizer folds a hw.struct_extract op that
-// returns a non-signless integer type
+// This pattern is a workaround until https://github.com/llvm/circt/issues/11309
+// is fixed
+// The canonicalizer will emit hw.constant ops when invoked by the inliner. It
+// does not check if an integer is actually of a signless type, which causes the
+// patterns invoked by the canonicalizer to fail. The error happens when the
+// canonicalizer folds a hw.struct_extract op that returns a non-signless
+// integer type
 struct ConvertNonSignlessHWConstantToHWArith
     : public OpRewritePattern<hw::ConstantOp> {
   using OpRewritePattern<hw::ConstantOp>::OpRewritePattern;
