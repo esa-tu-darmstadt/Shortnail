@@ -1,4 +1,5 @@
 add_subdirectory(AnalyzeISAX)
+add_subdirectory(CoreDSLConvertUnionRegisters)
 add_subdirectory(CoreDSLExplodeStructRegisters)
 add_subdirectory(CoreDSLLegalizeCF)
 add_subdirectory(CoreDSLToPy)

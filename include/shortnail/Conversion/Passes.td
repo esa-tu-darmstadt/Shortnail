@@ -74,6 +74,14 @@ def CoreDSLLegalizeCF : Pass<"coredsl-legalize-cf", "::mlir::coredsl::ISAXOp"> {
   ];
 }
 
+def CoreDSLConvertUnionRegisters : Pass<"coredsl-convert-union-registers", "::mlir::coredsl::ISAXOp"> {
+  let summary = "Convert union registers and their usages to non-union values";
+  let dependentDialects = [
+    "::mlir::coredsl::CoreDSLDialect",
+    "::circt::hw::HWDialect",
+  ];
+}
+
 def CoreDSLExplodeStructRegisters : Pass<"coredsl-explode-struct-registers", "::mlir::coredsl::ISAXOp"> {
   let summary = "Divide struct registers into multiple scalar registers";
   let dependentDialects = [
